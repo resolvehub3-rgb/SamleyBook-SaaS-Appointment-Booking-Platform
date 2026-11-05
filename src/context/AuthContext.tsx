@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { getSupabase, getSupabaseCredentials } from '../lib/supabase';
+import { getSupabase, getSupabaseCredentials, isValidSupabaseUrl, isValidAnonKey } from '../lib/supabase';
 import { Profile } from '../types/database';
 
 interface AuthContextType {
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isConfigured, setIsConfigured] = useState<boolean>(() => {
     const creds = getSupabaseCredentials();
-    return !!(creds.url && creds.anonKey);
+    return !!(creds.url && creds.anonKey && isValidSupabaseUrl(creds.url) && isValidAnonKey(creds.anonKey));
   });
 
   const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshClient = useCallback(() => {
     const creds = getSupabaseCredentials();
-    const configured = !!(creds.url && creds.anonKey);
+    const configured = !!(creds.url && creds.anonKey && isValidSupabaseUrl(creds.url) && isValidAnonKey(creds.anonKey));
     setIsConfigured(configured);
   }, []);
 

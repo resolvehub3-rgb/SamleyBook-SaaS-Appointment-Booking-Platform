@@ -41,7 +41,7 @@ export const SamleyLogo: React.FC<Props> = ({
             light ? 'text-white' : 'text-zinc-900'
           }`}
         >
-          SamleyBook
+          Samley<span className={light ? 'text-orange-300' : 'text-orange-700'}>Book</span>
         </span>
         {showAttribution && (
           <span

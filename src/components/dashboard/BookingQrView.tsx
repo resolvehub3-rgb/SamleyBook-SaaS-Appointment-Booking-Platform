@@ -16,19 +16,36 @@ export const BookingQrView: React.FC = () => {
   const { currentBusiness } = useBusiness();
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [baseUrl, setBaseUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem('samley_booking_base_url') || import.meta.env.VITE_APP_URL || window.location.origin;
+    } catch {
+      return import.meta.env.VITE_APP_URL || window.location.origin;
+    }
+  });
   const printRef = useRef<HTMLDivElement>(null);
 
   const bookingUrl = currentBusiness?.slug
-    ? `${window.location.origin}/b/${currentBusiness.slug}`
+    ? `${baseUrl.replace(/\/$/, '')}/b/${currentBusiness.slug}`
     : '';
+
+  const handleBaseUrlChange = (value: string) => {
+    setBaseUrl(value);
+    try {
+      localStorage.setItem('samley_booking_base_url', value.trim());
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     if (bookingUrl) {
       QRCode.toDataURL(bookingUrl, {
-        width: 600,
-        margin: 2,
+        width: 512,
+        margin: 4,
+        errorCorrectionLevel: 'H',
         color: {
-          dark: '#18181b',
+          dark: '#000000',
           light: '#ffffff',
         },
       })
@@ -100,7 +117,8 @@ export const BookingQrView: React.FC = () => {
                 <img
                   src={qrDataUrl}
                   alt="Business QR Code"
-                  className="w-64 h-64 rounded-xl shadow-xs bg-white p-2"
+                  className="w-64 h-64 shadow-xs bg-white p-2"
+                  style={{ imageRendering: 'pixelated' }}
                 />
               ) : (
                 <div className="w-64 h-64 flex items-center justify-center text-zinc-300">
@@ -166,6 +184,22 @@ export const BookingQrView: React.FC = () => {
                     </>
                   )}
                 </button>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  QR Code Base URL
+                </label>
+                <input
+                  type="url"
+                  value={baseUrl}
+                  onChange={(e) => handleBaseUrlChange(e.target.value)}
+                  placeholder="https://your-domain.com or http://192.168.x.x:3001"
+                  className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition"
+                />
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  Use a publicly reachable URL (or your computer's LAN IP when testing locally) so phones can open the booking page after scanning.
+                </p>
               </div>
 
               <div className="flex items-center gap-3 pt-1">

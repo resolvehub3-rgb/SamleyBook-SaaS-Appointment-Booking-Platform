@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, X, ArrowRight, Database } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
 import { SamleyLogo } from '../common/SamleyLogo';
 import { PWAInstallButton } from '../common/PWAInstallButton';
-import { SupabaseSetupModal } from '../common/SupabaseSetupModal';
+
 import { useAuth } from '../../context/AuthContext';
 
 interface Props {
@@ -13,7 +13,6 @@ interface Props {
 export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
   const { user, profile } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [dbModalOpen, setDbModalOpen] = useState(false);
 
   const navLinks = [
     { label: 'Home', href: 'home' },
@@ -58,16 +57,6 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Supabase status / config trigger */}
-            <button
-              onClick={() => setDbModalOpen(true)}
-              className="p-2 text-zinc-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition"
-              title="Supabase Database Configuration"
-              aria-label="Database Setup"
-            >
-              <Database className="w-4 h-4" />
-            </button>
-
             <PWAInstallButton variant="secondary" />
 
             {user ? (
@@ -105,13 +94,6 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={() => setDbModalOpen(true)}
-              className="p-2 text-zinc-400 hover:text-orange-600 rounded-lg"
-              aria-label="Database Configuration"
-            >
-              <Database className="w-4 h-4" />
-            </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 focus:outline-none"
@@ -185,7 +167,6 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
         )}
       </header>
 
-      <SupabaseSetupModal isOpen={dbModalOpen} onClose={() => setDbModalOpen(false)} />
     </>
   );
 };

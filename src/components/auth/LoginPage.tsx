@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight, AlertCircle, RefreshCw, Database, Copy, Check, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle, RefreshCw, Copy, Check, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getSupabase, getSupabaseCredentials } from '../../lib/supabase';
 import { SamleyLogo } from '../common/SamleyLogo';
@@ -73,13 +73,6 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
     } finally {
       setIsResending(false);
     }
-  };
-
-  const fillSuperAdmin = () => {
-    setEmail('samleybook@gmail.com');
-    setPassword('GoodGod1$');
-    setErrorMsg(null);
-    setIsEmailUnconfirmed(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -359,15 +352,7 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
                   )}
                 </button>
 
-                <div className="pt-1 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={fillSuperAdmin}
-                    className="text-[11px] font-semibold text-zinc-500 hover:text-orange-600 transition underline underline-offset-2"
-                  >
-                    Use Super Admin Credentials
-                  </button>
-                </div>
+
               </div>
             </form>
 
@@ -382,14 +367,7 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
                 </button>
               </p>
 
-              <button
-                type="button"
-                onClick={() => setDbModalOpen(true)}
-                className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-700"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>Supabase Connection Settings</span>
-              </button>
+
             </div>
           </div>
         </div>

@@ -52,6 +52,23 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
     };
 
     fetchPlans();
+
+    // Reveal sections on scroll
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('opacity-100', 'translate-y-0');
+            entry.target.classList.remove('opacity-0', 'translate-y-8');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+    const revealEls = document.querySelectorAll('[data-reveal]');
+    revealEls.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
   }, []);
 
   const defaultPlans: SubscriptionPlan[] = [
@@ -124,9 +141,14 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white scroll-smooth">
+      <style>{`
+        html { scroll-behavior: smooth; }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+        .float-anim { animation: float 4s ease-in-out infinite; }
+      `}</style>
       {/* HERO SECTION */}
-      <section id="home" className="relative pt-12 pb-24 overflow-hidden border-b border-zinc-100">
+      <section id="home" data-reveal className="relative pt-12 pb-24 overflow-hidden border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Column: Headlines & CTA */}
@@ -201,7 +223,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
 
             {/* Right Column: Visual Preview Card */}
             <div className="lg:col-span-5 relative">
-              <div className="relative mx-auto max-w-sm rounded-3xl bg-zinc-900 p-3 shadow-2xl ring-1 ring-zinc-800">
+              <div className="relative mx-auto max-w-sm rounded-3xl bg-zinc-900 p-3 shadow-2xl ring-1 ring-zinc-800 float-anim">
                 {/* Phone screen mockup */}
                 <div className="rounded-[22px] bg-white p-5 space-y-4 text-left overflow-hidden">
                   {/* Business header preview */}
@@ -275,7 +297,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       {/* PLATFORM FEATURES SECTION */}
-      <section id="features" className="py-24 bg-zinc-50/50 border-b border-zinc-100">
+      <section id="features" data-reveal className="py-24 bg-zinc-50/50 border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
@@ -351,7 +373,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="py-20 bg-white border-b border-zinc-100">
+      <section data-reveal className="py-20 bg-white border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
@@ -397,7 +419,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       {/* SUBSCRIPTION PACKAGES / PRICING */}
-      <section id="pricing" className="py-24 bg-zinc-50/50 border-b border-zinc-100">
+      <section id="pricing" data-reveal className="py-24 bg-zinc-50/50 border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
@@ -482,7 +504,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       {/* CONTACT SECTION (SamTeck Digital) */}
-      <section id="contact" className="py-24 bg-white border-b border-zinc-100">
+      <section id="contact" data-reveal className="py-24 bg-white border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 text-left">
             {/* Left info */}

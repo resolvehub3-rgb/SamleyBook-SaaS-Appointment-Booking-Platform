@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { User, Database, Shield, Smartphone, Key, Check, RefreshCw } from 'lucide-react';
+import React from 'react';
+import { User, Smartphone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { PWAInstallButton } from '../common/PWAInstallButton';
-import { SupabaseSetupModal } from '../common/SupabaseSetupModal';
 
 export const SettingsView: React.FC = () => {
-  const { profile, isConfigured } = useAuth();
-  const [dbModalOpen, setDbModalOpen] = useState(false);
+  const { profile } = useAuth();
 
   return (
     <div className="space-y-6 text-left max-w-4xl">
@@ -40,37 +38,6 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Supabase Connection Card */}
-      <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-6 md:p-8 space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <Database className="w-4 h-4 text-orange-600" />
-            <h3 className="text-base font-bold text-zinc-900">Supabase Infrastructure</h3>
-          </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-bold ${
-              isConfigured
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}
-          >
-            {isConfigured ? 'Connected to Supabase' : 'Configuration Pending'}
-          </span>
-        </div>
-
-        <p className="text-xs text-zinc-600 leading-relaxed">
-          SamleyBook operates exclusively on real Supabase PostgreSQL data, Supabase Realtime, and Supabase Storage. You can view your project credentials or copy the complete database schema script at any time.
-        </p>
-
-        <button
-          onClick={() => setDbModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 hover:border-orange-300 hover:text-orange-600 text-xs font-bold text-zinc-700 transition"
-        >
-          <Key className="w-4 h-4 text-orange-600" />
-          <span>Manage Supabase Keys & SQL Script</span>
-        </button>
-      </div>
-
       {/* PWA App Install Card */}
       <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-6 md:p-8 space-y-4">
         <div className="flex items-center gap-2.5 border-b border-zinc-100 pb-3">
@@ -85,7 +52,6 @@ export const SettingsView: React.FC = () => {
         <PWAInstallButton variant="primary" />
       </div>
 
-      <SupabaseSetupModal isOpen={dbModalOpen} onClose={() => setDbModalOpen(false)} />
     </div>
   );
 };

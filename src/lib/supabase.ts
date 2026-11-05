@@ -3,6 +3,24 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const STORAGE_KEY_URL = 'samley_supabase_url';
 const STORAGE_KEY_ANON_KEY = 'samley_supabase_anon_key';
 
+export function isValidSupabaseUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value.trim());
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !!parsed.hostname;
+  } catch {
+    return false;
+  }
+}
+
+// Anon keys are sent as HTTP headers, so they must be printable ASCII without
+// control characters (a common cause of "Invalid value" fetch errors).
+export function isValidAnonKey(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && /^[\x20-\x7E]+$/.test(trimmed);
+}
+
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -11,8 +29,21 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const localUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_URL) : null;
   const localKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_ANON_KEY) : null;
 
-  const url = (localUrl || envUrl || '').trim();
-  const anonKey = (localKey || envKey || '').trim();
+  const localValid =
+    isValidSupabaseUrl(localUrl) && isValidAnonKey(localKey);
+
+  // If stored credentials are invalid, clear them so they stop breaking requests
+  if (typeof window !== 'undefined' && (localUrl || localKey) && !localValid) {
+    try {
+      localStorage.removeItem(STORAGE_KEY_URL);
+      localStorage.removeItem(STORAGE_KEY_ANON_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  const url = (localValid ? (localUrl as string).trim() : envUrl || '').trim();
+  const anonKey = (localValid ? (localKey as string).trim() : envKey || '').trim();
 
   return { url, anonKey };
 }
@@ -35,7 +66,7 @@ let currentClientConfig = { url: '', anonKey: '' };
 export function getSupabase(): SupabaseClient | null {
   const { url, anonKey } = getSupabaseCredentials();
 
-  if (!url || !anonKey) {
+  if (!url || !anonKey || !isValidSupabaseUrl(url) || !isValidAnonKey(anonKey)) {
     return null;
   }
 
@@ -83,6 +114,20 @@ export async function testSupabaseConnection(url?: string, anonKey?: string): Pr
     return {
       success: false,
       message: 'Supabase URL and Anon Key are missing.',
+    };
+  }
+
+  if (!isValidSupabaseUrl(targetUrl)) {
+    return {
+      success: false,
+      message: 'Invalid Supabase URL. Please enter a valid project URL (https://your-project-id.supabase.co).',
+    };
+  }
+
+  if (!isValidAnonKey(targetKey)) {
+    return {
+      success: false,
+      message: 'Invalid Supabase Anon Key. Please enter a valid anon/public key.',
     };
   }
 

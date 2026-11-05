@@ -1,14 +1,74 @@
-import React from 'react';
-import { Sparkles, Clock, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Sparkles, Clock, CheckCircle2, AlertTriangle, ShieldCheck, Loader2 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
+import { getSupabase } from '../../lib/supabase';
 import { calculateTrialRemainingDays } from '../../utils/booking-logic';
 
 export const SubscriptionView: React.FC = () => {
-  const { currentBusiness, subscription } = useBusiness();
+  const { currentBusiness, subscription, refreshBusinessData } = useBusiness();
+  const [plans, setPlans] = useState<any[]>([]);
+  const [selecting, setSelecting] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ success: boolean; text: string } | null>(null);
 
   const trialInfo = subscription?.trial_end
     ? calculateTrialRemainingDays(subscription.trial_end)
     : { daysRemaining: 7, hoursRemaining: 168, isExpired: false };
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const { data } = await supabase.from('subscription_plans').select('*').order('price_ghs', { ascending: true });
+      setPlans(data || []);
+    };
+    fetchPlans();
+  }, []);
+
+  const getDbPlan = (name: string) =>
+    plans.find((p) => (p.name || '').toLowerCase() === name.toLowerCase() || (p.code || '').toLowerCase() === name.toLowerCase().replace(' plan', '').trim());
+
+  const handleSelectPlan = async (planName: string) => {
+    if (!currentBusiness) return;
+    const dbPlan = getDbPlan(planName);
+    if (!dbPlan) {
+      setFeedback({ success: false, text: `Plan "${planName}" is not available in the database yet.` });
+      return;
+    }
+    const supabase = getSupabase();
+    if (!supabase) {
+      setFeedback({ success: false, text: 'Supabase is not configured.' });
+      return;
+    }
+
+    setSelecting(planName);
+    setFeedback(null);
+    try {
+      if (subscription?.id) {
+        const { error } = await supabase
+          .from('business_subscriptions')
+          .update({
+            plan_id: dbPlan.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', subscription.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('business_subscriptions').insert({
+          business_id: currentBusiness.id,
+          plan_id: dbPlan.id,
+          status: 'trialing',
+          payment_status: 'none',
+        });
+        if (error) throw error;
+      }
+      await refreshBusinessData();
+      setFeedback({ success: true, text: `${planName} selected successfully. Your subscription has been updated.` });
+    } catch (err) {
+      setFeedback({ success: false, text: err instanceof Error ? err.message : 'Failed to select plan.' });
+    } finally {
+      setSelecting(null);
+    }
+  };
 
   return (
     <div className="space-y-6 text-left max-w-4xl">
@@ -86,6 +146,19 @@ export const SubscriptionView: React.FC = () => {
         </div>
       </div>
 
+      {feedback && (
+        <div
+          className={`p-4 rounded-2xl text-xs flex items-start gap-3 border ${
+            feedback.success
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+        >
+          {feedback.success ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}
+          <span>{feedback.text}</span>
+        </div>
+      )}
+
       {/* Available Plans for Upgrade */}
       <div className="space-y-4 pt-2">
         <h3 className="text-base font-bold text-zinc-900">Standard Subscription Packages</h3>
@@ -116,24 +189,47 @@ export const SubscriptionView: React.FC = () => {
             >
               <div className="space-y-3">
                 <h4 className="text-base font-bold text-zinc-900">{plan.name}</h4>
-                <p className="text-lg font-black text-orange-600">{plan.price}</p>
+                <p className="text-lg font-black text-orange-600">
+                  {(() => {
+                    const dbPlan = getDbPlan(plan.name);
+                    return dbPlan ? `GHS ${Number(dbPlan.price_ghs).toFixed(2)} / ${dbPlan.billing_cycle === 'yearly' ? 'year' : 'month'}` : plan.price;
+                  })()}
+                </p>
                 <div className="space-y-2 pt-2 border-t border-zinc-100">
-                  {plan.features.map((f, fIdx) => (
-                    <div key={fIdx} className="flex items-center gap-2 text-xs text-zinc-600">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-orange-600" />
-                      <span>{f}</span>
-                    </div>
-                  ))}
+                  {(() => {
+                    const dbPlan = getDbPlan(plan.name);
+                    const features = Array.isArray(dbPlan?.features) && dbPlan.features.length ? dbPlan.features : plan.features;
+                    return features.map((f: string, fIdx: number) => (
+                      <div key={fIdx} className="flex items-center gap-2 text-xs text-zinc-600">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-orange-600" />
+                        <span>{f}</span>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
 
               <div className="pt-6">
                 <button
                   type="button"
-                  className="w-full py-2.5 rounded-xl border border-zinc-200 font-bold text-xs uppercase tracking-wider text-zinc-800 hover:bg-zinc-50 transition"
-                  onClick={() => alert(`Upgrading to ${plan.name} will be processed via Moolre merchant payment upon trial conclusion.`)}
+                  disabled={selecting === plan.name}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition ${
+                    subscription?.plan?.name === plan.name
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'border border-zinc-200 text-zinc-800 hover:bg-zinc-50'
+                  } disabled:opacity-60`}
+                  onClick={() => handleSelectPlan(plan.name)}
                 >
-                  Select Plan
+                  {selecting === plan.name ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Selecting...
+                    </span>
+                  ) : subscription?.plan?.name === plan.name ? (
+                    'Selected Plan'
+                  ) : (
+                    'Select Plan'
+                  )}
                 </button>
               </div>
             </div>

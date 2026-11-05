@@ -118,7 +118,7 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
     try {
       const supabase = getSupabase();
       if (!supabase) {
-        throw new Error('Supabase is not configured. Please click the DB icon in header to configure your keys.');
+        throw new Error('Supabase is not configured. Please configure your Supabase keys in Settings or on the login page.');
       }
 
       // 1. Sign up owner account in Supabase Auth
