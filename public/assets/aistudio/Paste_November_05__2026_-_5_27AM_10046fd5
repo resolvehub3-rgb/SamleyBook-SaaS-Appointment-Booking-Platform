@@ -1,0 +1,1169 @@
+# PROJECT: SAMLEY — COMPLETE SAAS APPOINTMENT BOOKING PLATFORM
+
+## 1. YOUR ROLE AND PROJECT OBJECTIVE
+
+Act as a senior full-stack software architect, UI/UX designer, database engineer, security engineer and SaaS developer.
+
+Build a complete, production-ready, multi-tenant SaaS appointment-booking platform called **Samley**, a product by **SamTeck Digital**.
+
+Samley is a general-purpose appointment-booking platform for businesses that operate through appointments and scheduled services.
+
+Examples include:
+- Salons and barbershops
+- Spas and wellness centres
+- Beauty and grooming businesses
+- Photography studios
+- Consultation services
+- Other appointment-based businesses
+
+The platform must allow business owners to register their businesses, configure services, receive online bookings, manage appointments, receive payments through Moolre and communicate with customers through SMS.
+
+Customers must be able to access a business's public booking page by scanning its QR code without downloading an application or creating an account.
+
+**Important development instructions:**
+- Build a real, functional SaaS platform, not a prototype.
+- Do not generate mock, fake, dummy or sample business data.
+- Do not create decorative buttons that do nothing.
+- Do not introduce features outside the requirements in this document.
+- Do not remove or silently change any explicitly requested functionality.
+- Do not expose private API keys, service-role keys or payment credentials in frontend code.
+- All database operations, payment verification and sensitive business logic must be implemented securely.
+- Every major feature must be connected to the actual backend.
+- Do not claim that an integration works unless it has been implemented and tested against the provider's actual capabilities.
+
+---
+
+## 2. TECHNOLOGY AND ARCHITECTURE
+
+Use the following architecture:
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- Responsive component architecture
+- Montserrat font family throughout the entire platform
+- Progressive Web App (PWA) support
+
+### Backend and database
+Use Supabase as the backend infrastructure.
+
+Required Supabase services:
+- Supabase PostgreSQL database
+- Supabase Authentication
+- Supabase Storage
+- Supabase Realtime
+- Supabase Edge Functions where appropriate
+- Row Level Security (RLS)
+
+The application must use a properly structured multi-tenant database.
+
+Every business must have independent records and data. One business must never be able to access another business's private information.
+
+A single owner account should be able to manage multiple independent businesses and switch between them without logging out. Each business must maintain its own services, bookings, customer records, public booking page, payment configuration and subscription information.
+
+Do not use Prisma or Neon. Use Supabase directly.
+
+---
+
+## 3. BRAND IDENTITY AND DESIGN SYSTEM
+
+Product name: **Samley**
+
+Brand attribution: **A product by SamTeck Digital**
+
+### Colours
+Use:
+- Deep orange as the primary brand colour.
+- White as the main background colour.
+- Dark charcoal or a suitable neutral colour for readable text.
+- Subtle neutral colours for borders, cards and secondary interface elements.
+
+The overall appearance must be professional, modern, clean and trustworthy.
+
+Avoid excessive gradients, unnecessary decorative effects and generic AI-generated dashboard styling.
+
+### Typography
+Use the Montserrat font family throughout:
+- Headings
+- Navigation
+- Buttons
+- Forms
+- Dashboard cards
+- Tables
+- Booking pages
+- Notifications and other interface elements
+
+### Logo
+The owner will provide the official Samley logo.
+
+Do not invent a replacement logo. Create a suitable logo placement that can be updated when the official asset is provided.
+
+---
+
+## 4. APPLICATION STRUCTURE
+
+Build four clearly separated application experiences:
+
+1. Samley marketing website.
+2. Super Admin dashboard.
+3. Business Owner dashboard.
+4. Public customer booking pages.
+
+These experiences must not be mixed together.
+
+### 4.1 Samley marketing website
+
+The marketing landing page is the public website explaining what Samley does.
+
+It must NOT display:
+- Registered businesses.
+- Business directories.
+- Business service listings.
+- Individual business booking pages.
+- Customer appointments.
+
+The landing page should contain only the marketing information necessary to introduce the platform.
+
+Required sections:
+
+**Hero section**
+- Introduce Samley as an appointment-booking and business-management platform.
+- Explain how businesses can manage appointments and customers can book services online.
+- Include clear Register Your Business and Login actions.
+
+**Features section**
+Explain the platform's actual capabilities, including:
+- Online appointment booking.
+- Business service management.
+- Custom business booking pages.
+- QR-code booking access.
+- Appointment management.
+- Moolre payment integration.
+- SMS booking notifications.
+- Appointment reminders.
+- Mobile-friendly PWA experience.
+
+**Pricing section**
+Display the available subscription packages.
+
+Pricing information must come from the platform's subscription-plan configuration rather than invented prices.
+
+**Contact section**
+Provide a contact section for SamTeck Digital.
+
+**Navigation**
+Include appropriate marketing navigation links such as:
+- Home
+- Features
+- Pricing
+- Contact
+- Login
+- Register
+
+The marketing website may have its own navigation and footer.
+
+However, the marketing navigation and footer must never appear inside the Super Admin or Business Owner dashboards.
+
+---
+
+## 5. BUSINESS OWNER REGISTRATION
+
+Build a structured, two-stage business registration process.
+
+Registration must be simple, professional and easy to complete on mobile devices.
+
+### Stage One: Personal Details
+
+The first registration section must collect the business owner's personal account information.
+
+Required fields:
+- Full name
+- Email address
+- Phone number
+- Password
+- Confirm password
+
+Validate all fields properly.
+
+Email addresses must be unique for owner accounts.
+
+Passwords must be securely handled through Supabase Authentication.
+
+After completing the personal details, display a button labelled:
+
+**Continue to Business Profile**
+
+The user must not be sent directly to the dashboard yet.
+
+### Stage Two: Business Profile
+
+After clicking Continue to Business Profile, display the second registration section.
+
+Collect the following information:
+- Business name
+- Business category
+- Business description
+- Business phone number
+- Business email address, where applicable
+- Business location/address
+- Business logo or profile image, where applicable
+
+Allow the owner to select an appropriate business category.
+
+The business profile must be associated with the authenticated owner account.
+
+Display a clear Register Business button.
+
+### Registration submission
+
+When the owner submits the registration:
+
+1. Validate the personal account and business information.
+2. Create the owner account.
+3. Create the business profile.
+4. Associate the business with the owner.
+5. Assign the default seven-day free trial.
+6. Record the registration date and trial expiry date.
+7. Set the appropriate initial subscription status.
+8. Make the newly registered business immediately visible in the Super Admin dashboard.
+9. Send a registration confirmation SMS.
+10. Send a registration confirmation email containing the correct dashboard access URL.
+
+The registration and business creation process must be reliable and protected against duplicate submissions.
+
+Use appropriate server-side transactions or compensating operations to avoid orphaned owner accounts or incomplete business registrations.
+
+SMS or email delivery failure must not silently create duplicate registrations or destroy an otherwise successful registration.
+
+### Registration confirmation SMS
+
+Send a message similar to:
+
+"Welcome to Samley! Your business has been successfully registered. Your 7-day free trial is now active. You can access your business dashboard here: [Dashboard Link]. Thank you for choosing Samley."
+
+### Registration confirmation email
+
+Send a professional email confirming registration.
+
+The email must contain:
+- Owner's name.
+- Business name.
+- Registration confirmation.
+- Seven-day free-trial information.
+- Dashboard login URL.
+- Instructions to sign in using the registered account credentials.
+
+Do not send passwords in emails or SMS messages.
+
+The dashboard URL must be centrally configurable rather than hardcoded throughout the application.
+
+---
+
+## 6. SEVEN-DAY FREE TRIAL AND SUBSCRIPTION MANAGEMENT
+
+Every newly registered business receives a seven-day free trial.
+
+The trial begins after successful business registration.
+
+Record:
+- Registration timestamp.
+- Trial start timestamp.
+- Trial expiry timestamp.
+- Subscription plan.
+- Subscription status.
+- Current subscription period.
+- Payment status.
+
+The initial subscription status must clearly identify the business as being on a free trial.
+
+The Super Admin must be able to see:
+- Business name.
+- Business owner.
+- Registration date.
+- Selected subscription package, where applicable.
+- Trial start date.
+- Trial expiry date.
+- Remaining trial period.
+- Subscription status.
+
+The platform must calculate trial expiry using server-side timestamps.
+
+Do not rely on the browser clock to determine whether a trial is active.
+
+Do not invent subscription package prices or durations. Build the subscription structure so that the actual packages and pricing can be configured through the platform.
+
+---
+
+## 7. SUPER ADMIN DASHBOARD
+
+Create a separate Super Admin authentication and dashboard experience.
+
+The Super Admin must have access to the overall Samley platform.
+
+The Super Admin dashboard must use a professional sidebar layout.
+
+### Sidebar
+
+Include only the necessary navigation for the required administration functions:
+- Overview
+- Registered Businesses
+- Subscriptions
+- Subscription Plans
+- Payment Records
+- Platform Settings
+- Logout
+
+### Important layout requirements
+
+The Super Admin dashboard must NOT contain:
+- The marketing website navigation header.
+- Marketing navigation links.
+- The marketing website footer.
+
+Use a dedicated dashboard layout.
+
+On desktop:
+- Display a fixed or collapsible sidebar.
+- Keep the main content area properly spaced.
+- Support a clean dashboard layout.
+
+On mobile:
+- Display a hamburger menu.
+- The hamburger must open and close the sidebar smoothly.
+- Sidebar navigation must be touch-friendly.
+- The sidebar must not obstruct the entire application unnecessarily.
+- Animations must be smooth and responsive.
+
+### Dashboard overview
+
+Display actual database information, including:
+- Total registered businesses.
+- Businesses currently on free trial.
+- Active subscriptions.
+- Expired subscriptions.
+- Total recorded subscription payments.
+- Recent business registrations.
+
+Do not use hardcoded dashboard figures.
+
+### Registered Businesses
+
+Every successful registration must appear here immediately.
+
+Display:
+- Business name.
+- Owner's name.
+- Business category.
+- Owner's email.
+- Business phone.
+- Registration date.
+- Subscription package.
+- Trial status.
+- Subscription status.
+
+The Super Admin must be able to open a business record and view its relevant information.
+
+### Subscription Plans
+
+Provide the necessary administration interface for configuring the actual subscription packages displayed on the marketing website and used by the platform.
+
+Do not invent package prices or package limits.
+
+All subscription information must come from the database.
+
+---
+
+## 8. BUSINESS OWNER DASHBOARD
+
+Every business owner must have a dedicated dashboard.
+
+The dashboard must show information belonging only to the selected business.
+
+If an owner manages multiple businesses, provide a business switcher to move between them.
+
+Switching businesses must load the correct business data without logging out.
+
+### Dashboard layout
+
+Use a sidebar navigation system.
+
+Required sections:
+- Overview
+- Services
+- Appointments
+- Customers
+- Payments
+- Payment Configuration
+- Business Profile
+- Booking Page and QR Code
+- Subscription
+- Settings
+- Logout
+
+Do not add employee or staff management.
+
+### Mobile and desktop behaviour
+
+Desktop:
+- Persistent or collapsible sidebar.
+- Properly organised dashboard content.
+- Suitable spacing and readable information.
+
+Mobile:
+- Hamburger menu.
+- Animated sidebar opening and closing.
+- Smooth transitions.
+- Responsive cards, forms, tables and navigation.
+- No horizontal overflow.
+- Touch-friendly controls.
+
+The business dashboard must not display the marketing website header or footer.
+
+### Dashboard overview
+
+Display real business information:
+- Total appointments.
+- Upcoming appointments.
+- Completed appointments.
+- Pending appointments.
+- Cancelled appointments.
+- Total customers.
+- Payment records.
+- Recent bookings.
+
+All figures must come from Supabase.
+
+Use Supabase Realtime to update relevant dashboard information when new bookings or payment updates occur.
+
+---
+
+## 9. BUSINESS SERVICE MANAGEMENT
+
+The business owner must be able to create and manage services.
+
+The Services section must allow the owner to:
+
+- Add a service.
+- Upload a service image.
+- Enter the service name.
+- Enter a service description.
+- Set the service price.
+- Set the service duration.
+- Edit an existing service.
+- Deactivate a service.
+- Reactivate a service.
+- Delete a service when permitted by its booking history and data relationships.
+
+### Service information
+
+Each service must contain:
+- Service ID.
+- Business ID.
+- Service name.
+- Description.
+- Image URL.
+- Price.
+- Duration.
+- Active/inactive status.
+- Creation timestamp.
+- Updated timestamp.
+
+Store service images in Supabase Storage.
+
+Use secure upload policies and validate uploaded files.
+
+A service must belong to one specific business.
+
+### Public service display
+
+When a service is created successfully, it must become available on that business's public booking page, provided it is active.
+
+Display:
+- Service image.
+- Service name.
+- Service description.
+- Price.
+- Duration.
+- Booking action.
+
+Do not display inactive services to customers.
+
+Do not display services belonging to other businesses.
+
+---
+
+## 10. BUSINESS PUBLIC BOOKING PAGE
+
+Each registered business must have its own independent public booking page.
+
+This page is separate from the Samley marketing website.
+
+Example URL structure:
+
+`https://your-domain.com/b/business-slug`
+
+The actual domain must be configurable.
+
+Each business must have a unique, validated public slug.
+
+A customer's QR code must direct the customer to the correct business booking page.
+
+### Initial page
+
+When a customer scans the business QR code, the customer must immediately see that business's public service page.
+
+The first page must display:
+- Business logo or profile image.
+- Business name.
+- Business description.
+- Available services.
+- Service images.
+- Service prices.
+- Service durations.
+
+The customer must first be able to view the available services before selecting what to book.
+
+Do not redirect customers to another business.
+
+Do not show the Samley business directory on this page.
+
+### Service selection
+
+Customers must be able to select the service they want.
+
+After selecting a service, continue to the appointment details and booking process.
+
+---
+
+## 11. QR CODE GENERATION
+
+Every business must have its own unique QR code.
+
+The QR code must point to that business's public booking URL.
+
+In the Business Owner dashboard, create a Booking Page and QR Code section.
+
+The owner must be able to:
+- View the business QR code.
+- Download the QR code.
+- Print the QR code.
+- Copy the public booking link.
+
+The QR code must remain connected to the correct business even when the owner updates service information.
+
+Use a reliable QR-code generation implementation.
+
+Do not generate QR codes containing temporary or incorrect URLs.
+
+---
+
+## 12. CUSTOMER BOOKING PROCESS
+
+Customers must not be required to:
+- Download an application.
+- Create an account.
+- Register with Samley.
+- Log in.
+
+The customer journey must be straightforward.
+
+### Step One: Open business page
+
+Customer scans the QR code and opens the correct business booking page.
+
+### Step Two: Select service
+
+The customer views the business's services and selects the required service.
+
+Display the service image, name, description, price and duration.
+
+### Step Three: Customer details
+
+Collect:
+- Customer full name.
+- Customer phone number.
+- Customer email address, where possible.
+
+The phone number is required for SMS notifications.
+
+Email may be optional.
+
+### Step Four: Appointment date and time
+
+Allow the customer to select an available appointment date and time.
+
+The booking engine must consider:
+- Business availability.
+- Configured business operating hours.
+- Service duration.
+- Existing appointments.
+- Appointment conflicts.
+- Unavailable dates and times.
+
+Do not show appointment slots that are already unavailable.
+
+Do not allow two confirmed bookings to occupy conflicting time slots where the business's booking rules do not permit it.
+
+Perform availability validation on the server before accepting a booking.
+
+### Step Five: Payment
+
+After the customer selects the service, enters their details and selects an available appointment time, proceed to the payment section.
+
+---
+
+## 13. PAYMENT CONFIGURATION AND MOOLRE INTEGRATION
+
+Use **Moolre** as the payment provider.
+
+Do not build an independent payment gateway.
+
+Do not require each business owner to enter their own API keys.
+
+The platform must manage the Moolre integration securely on the server side.
+
+### Business payment configuration
+
+Inside the Business Owner dashboard, provide a Payment Configuration section.
+
+The business owner must be able to enter and update the Mobile Money number designated to receive payments for that business.
+
+Collect the necessary information required by the confirmed Moolre merchant-payment workflow.
+
+Do not ask the business owner to provide API secrets or private developer credentials.
+
+### Payment destination
+
+The intended payment arrangement is:
+
+1. The customer selects a service and proceeds to payment.
+2. The platform initiates payment through Moolre.
+3. The business's configured Mobile Money destination is associated with the payment.
+4. Moolre processes the transaction.
+5. Moolre handles settlement to the intended business destination, subject to the merchant and settlement capabilities supported by Moolre.
+6. Samley receives a verified payment result and updates the booking accordingly.
+
+**Critical Moolre integration requirement:**
+
+Before implementing this flow, inspect and use Moolre's actual API documentation and supported merchant-account arrangements.
+
+Verify whether Moolre supports the required per-business payment destination and direct settlement model.
+
+Do not assume that entering a Mobile Money number automatically enables direct settlement.
+
+If Moolre requires merchant onboarding, sub-merchant registration, recipient verification or a specific settlement configuration, implement the supported process.
+
+If the desired direct-settlement arrangement is not supported by the available Moolre integration, clearly identify the limitation instead of implementing a fake transfer or displaying a misleading payment-success message.
+
+All API calls and credentials must remain server-side.
+
+### Payment options
+
+The business owner must be able to configure whether customers can:
+
+- Pay the full service price.
+- Pay a deposit/down payment.
+
+The owner must configure the deposit amount or percentage.
+
+The public booking page must respect the selected business payment configuration.
+
+The backend must calculate and validate the payment amount.
+
+Never trust a payment amount supplied by the browser.
+
+### Payment verification
+
+Implement:
+- Secure payment initiation.
+- Server-side payment verification.
+- Verified payment status.
+- Payment reference storage.
+- Transaction status updates.
+- Duplicate callback protection.
+- Idempotent payment processing.
+- Appropriate pending, successful and failed payment states.
+
+A booking must not be marked as successfully paid merely because the customer returns to the website after initiating payment.
+
+Only a verified Moolre payment result can confirm payment.
+
+---
+
+## 14. BOOKING CREATION AND BUSINESS NOTIFICATIONS
+
+When a customer submits a booking, the booking must be saved in Supabase and associated with the correct business.
+
+The Business Owner dashboard must display new bookings in real time.
+
+The booking record must include:
+- Booking ID.
+- Business ID.
+- Customer name.
+- Customer phone number.
+- Customer email, where provided.
+- Selected service.
+- Appointment date.
+- Appointment time.
+- Service price.
+- Required payment amount.
+- Payment status.
+- Booking status.
+- Booking creation timestamp.
+
+The owner must be able to view the booking information from the Appointments section.
+
+Use Supabase Realtime to update the dashboard when new bookings arrive.
+
+The booking and payment workflow must be designed carefully so that pending payments, unsuccessful payments and confirmed bookings are not confused.
+
+Do not lose a booking simply because a payment callback is delayed.
+
+---
+
+## 15. SMS INTEGRATION
+
+Implement an SMS integration for transactional notifications.
+
+The SMS provider must be configurable through secure backend configuration.
+
+Do not invent an SMS provider API or pretend that SMS messages have been delivered when they have not.
+
+### Business registration SMS
+
+When business registration succeeds, send a confirmation SMS to the owner's registered phone number.
+
+### Customer booking confirmation SMS
+
+When a customer successfully submits a booking, send an SMS to the customer's registered phone number.
+
+Example:
+
+"Hello [Customer Name], your appointment booking with [Business Name] has been successfully submitted for [Appointment Date] at [Appointment Time]. Thank you."
+
+The exact message must reflect the actual booking and payment status.
+
+Do not tell customers that a booking is fully confirmed if the business or payment workflow still has an outstanding requirement.
+
+### Appointment reminder SMS
+
+Send an SMS reminder to the customer's phone number approximately 24 hours before the appointment.
+
+Example:
+
+"Reminder: Your appointment with [Business Name] is scheduled for tomorrow at [Appointment Time]. We look forward to seeing you."
+
+The reminder must:
+- Use the actual appointment date and time.
+- Be sent to the correct customer.
+- Use the correct business name.
+- Respect the business's configured timezone.
+- Avoid duplicate reminders.
+- Not send reminders for cancelled appointments.
+
+Use a scheduled backend process or reliable scheduled job.
+
+Do not depend on a customer keeping the website open.
+
+Maintain an SMS delivery log containing the relevant message, recipient, notification type, delivery status and timestamp.
+
+SMS failures must be logged and handled without creating duplicate bookings.
+
+---
+
+## 16. PROGRESSIVE WEB APP (PWA)
+
+Samley must be a proper installable PWA.
+
+The platform must be responsive and usable across:
+- Android phones.
+- iPhones and iPads.
+- Tablets.
+- Windows desktop devices.
+- Other modern browsers.
+
+Implement:
+- Web app manifest.
+- Appropriate application icons.
+- Installable PWA configuration.
+- Service worker.
+- Appropriate caching strategies.
+- Responsive layouts.
+- App-like navigation where suitable.
+
+The Business Owner dashboard must be installable as a PWA.
+
+Public customer booking pages must remain accessible directly through a normal browser.
+
+Customers must not be forced to install the application.
+
+Do not allow stale cached booking availability or payment information to override live server data.
+
+Payment processing and appointment availability must always be verified against the backend.
+
+---
+
+## 17. DATABASE DESIGN AND SUPABASE SQL
+
+This section is extremely important.
+
+Design the complete Supabase PostgreSQL database to support every feature described in this document.
+
+Generate a complete, executable SQL setup script that can be pasted directly into the Supabase SQL Editor and run.
+
+Do not provide an incomplete schema.
+
+Do not leave important tables, relationships, indexes, constraints or security policies for manual creation.
+
+The database must include all necessary structures for the actual application.
+
+At minimum, design appropriate tables for:
+
+1. Owner profiles.
+2. Businesses.
+3. Owner-business relationships.
+4. Business categories, where needed.
+5. Subscription plans.
+6. Business subscriptions.
+7. Services.
+8. Service images or storage references.
+9. Customers.
+10. Appointments/bookings.
+11. Booking service details, where needed.
+12. Business payment configuration.
+13. Payment transactions.
+14. Payment provider references.
+15. SMS notification logs.
+16. Email notification logs.
+17. Business operating hours.
+18. Business availability and closures.
+19. Appointment availability or booking holds, where required.
+20. Relevant audit and system records.
+
+Create proper foreign keys and relationships.
+
+Use UUID identifiers where appropriate.
+
+Add:
+- Created timestamps.
+- Updated timestamps.
+- Appropriate status fields.
+- Unique constraints.
+- Useful indexes.
+- Appropriate database checks.
+- Cascading rules only where safe.
+
+Use database constraints and server-side validation to protect booking and payment integrity.
+
+### RLS requirements
+
+Enable Row Level Security on every table containing protected business or owner data.
+
+Implement appropriate policies so:
+- Owners can access only businesses they are authorised to manage.
+- Owners can access only their businesses' services.
+- Owners can access only their businesses' appointments.
+- Owners can access only their businesses' customers.
+- Owners can access only their businesses' payment records.
+- Public customers can read only the necessary public business information and active services.
+- Public booking submissions are restricted to the required booking fields and business.
+- Super Admin access is restricted to properly authorised administrative accounts.
+
+Never trust a frontend role value to grant Super Admin permissions.
+
+Use secure server-side authorisation for administrative operations.
+
+Never expose the Supabase service-role key in the frontend.
+
+### Database setup output
+
+Provide:
+1. Complete SQL schema.
+2. Foreign keys and relationships.
+3. Indexes and constraints.
+4. RLS activation statements.
+5. All required RLS policies.
+6. Required database functions and triggers.
+7. Storage bucket creation and access policies where appropriate.
+8. Realtime configuration for the required tables.
+9. Any required database extensions.
+10. Clear execution instructions for the Supabase SQL Editor.
+
+The SQL must match the actual frontend and backend implementation.
+
+Do not create database tables that are disconnected from the application.
+
+Do not build frontend functionality that has no corresponding database structure.
+
+Do not leave important database functionality as a future task.
+
+---
+
+## 18. REAL-TIME FUNCTIONALITY
+
+Use Supabase Realtime where appropriate.
+
+The platform must update important information without requiring manual page refreshes.
+
+Examples:
+- Newly registered businesses appear in the Super Admin dashboard.
+- New appointments appear in the Business Owner dashboard.
+- Appointment status changes update the relevant dashboard.
+- Verified payment status changes are reflected in the booking.
+- Relevant dashboard totals update when records change.
+
+Use secure subscriptions and ensure that users only receive events they are authorised to access.
+
+Do not use fake polling or static values as a substitute for actual real-time functionality.
+
+---
+
+## 19. SECURITY AND DATA PROTECTION
+
+Security is a core requirement.
+
+Implement:
+- Secure authentication.
+- Server-side authorisation.
+- Tenant isolation.
+- Supabase RLS.
+- Secure password handling.
+- Input validation.
+- File upload validation.
+- Payment verification.
+- Secure API credentials.
+- Rate limiting where appropriate.
+- Protection against duplicate bookings.
+- Protection against duplicate payment callbacks.
+- Safe error handling.
+- Appropriate audit records.
+
+Never expose:
+- Supabase service-role keys.
+- Moolre private API credentials.
+- SMS provider secrets.
+- Email provider credentials.
+
+Do not store sensitive payment credentials in public database fields.
+
+Do not rely on hidden frontend components or client-side checks as security controls.
+
+---
+
+## 20. RESPONSIVE DASHBOARD ANIMATIONS
+
+All dashboards must be professionally animated without sacrificing performance.
+
+Required behaviour:
+- Smooth sidebar transitions.
+- Smooth mobile hamburger-menu interaction.
+- Animated opening and closing of dashboard navigation.
+- Subtle card loading transitions.
+- Appropriate page transitions.
+- Smooth modal and dropdown interactions.
+- Responsive sidebar behaviour on desktop and mobile.
+
+Animations must be purposeful and lightweight.
+
+Do not introduce unnecessary animations that slow down mobile devices.
+
+The mobile hamburger menu must work correctly on both the Super Admin and Business Owner dashboards.
+
+---
+
+## 21. ERROR HANDLING AND USER EXPERIENCE
+
+Provide clear loading, success, empty and error states.
+
+Examples:
+- Registration successful.
+- Invalid registration information.
+- Email already registered.
+- Business profile saved.
+- Service uploaded successfully.
+- Booking submitted.
+- Payment pending.
+- Payment failed.
+- Payment verified.
+- SMS delivery failed.
+- No appointments available.
+- Subscription expired.
+
+Do not display success messages when the corresponding backend operation has failed.
+
+Do not silently discard failed database writes.
+
+Prevent duplicate submissions through proper frontend and backend controls.
+
+All forms must be validated on both the frontend and backend.
+
+---
+
+## 22. REQUIRED APPLICATION ROUTES
+
+Create a clear route structure for the separate application experiences.
+
+Suggested routes:
+
+### Marketing
+- `/`
+- `/features`
+- `/pricing`
+- `/contact`
+
+### Authentication and registration
+- `/register`
+- `/login`
+- `/forgot-password`
+
+### Super Admin
+- `/admin`
+- `/admin/businesses`
+- `/admin/subscriptions`
+- `/admin/plans`
+- `/admin/payments`
+- `/admin/settings`
+
+### Business Owner
+- `/dashboard`
+- `/dashboard/services`
+- `/dashboard/appointments`
+- `/dashboard/customers`
+- `/dashboard/payments`
+- `/dashboard/payment-configuration`
+- `/dashboard/booking-page`
+- `/dashboard/subscription`
+- `/dashboard/business-profile`
+- `/dashboard/settings`
+
+### Public business booking
+- `/b/:businessSlug`
+
+Use appropriate authentication guards and authorisation checks.
+
+A public business booking route must not expose private dashboard information.
+
+---
+
+## 23. STRICTLY EXCLUDED FROM THIS VERSION
+
+Do not implement the following in this release:
+
+- Employee management.
+- Staff accounts.
+- Employee login.
+- Staff scheduling.
+- Appointment assignment to employees.
+- Employee attendance.
+- Employee payroll.
+- Employee performance tracking.
+- Customer account registration.
+- Customer login.
+- A public business directory on the marketing landing page.
+- Features that are not explicitly described in this specification.
+
+Employee and business staff management are deliberately postponed for a future development phase.
+
+Do not create database structures, dashboard menus, forms or placeholder pages for employee management.
+
+---
+
+## 24. FINAL DEVELOPMENT AND TESTING REQUIREMENTS
+
+Build the application as a complete working system.
+
+Before considering development complete, verify the following:
+
+### Registration
+- An owner can complete personal details.
+- The owner can continue to business profile.
+- The owner can complete business registration.
+- The business is saved correctly.
+- A seven-day free trial is assigned.
+- The Super Admin can see the newly registered business.
+- Registration confirmation email is sent.
+- Registration confirmation SMS is sent.
+
+### Business management
+- The owner can sign in.
+- The owner can switch between their businesses.
+- The owner can create and edit services.
+- Service images upload correctly.
+- Service prices and durations are saved.
+- Each business sees only its own records.
+
+### Public booking
+- Every business has a unique public page.
+- Every business has a correct QR code.
+- Customers can scan the QR code.
+- Customers can view services.
+- Customers can enter their details.
+- Customers can select available appointment times.
+- Customers can submit bookings without registering or logging in.
+
+### Payments
+- Moolre payment initiation works through the actual supported API.
+- The correct business payment destination is used according to the confirmed Moolre settlement arrangement.
+- Full payment and deposit options work.
+- Payment verification happens server-side.
+- Failed and pending payments are handled correctly.
+- Duplicate payment callbacks do not create duplicate transactions.
+
+### Notifications
+- Booking confirmation SMS works.
+- Appointment reminders are scheduled correctly.
+- Cancelled bookings do not receive appointment reminders.
+- Notification delivery failures are logged.
+
+### Dashboards
+- Super Admin sees real platform data.
+- Business Owner sees real business data.
+- Dashboard information updates in real time.
+- Sidebar works on desktop.
+- Mobile hamburger menu works.
+- Animations work correctly.
+- No marketing header or footer appears inside the dashboards.
+
+### Database
+- The complete SQL script executes successfully in Supabase.
+- All required tables exist.
+- Relationships and constraints work.
+- RLS policies work.
+- Storage policies work.
+- Realtime subscriptions work.
+- No sensitive credentials are exposed.
+
+### PWA and responsiveness
+- The PWA can be installed.
+- The application works on mobile.
+- The application works on desktop.
+- Customer booking pages work without installing the PWA.
+- No important interface overflows on small screens.
+
+---
+
+## 25. FINAL INSTRUCTIONS
+
+Follow this specification exactly.
+
+The objective is to deliver a real, secure, production-ready Samley SaaS appointment-booking platform.
+
+Do not add unrelated features or make assumptions about business rules that have not been specified.
+
+Where a required external integration depends on provider documentation or merchant approval, verify the actual supported capabilities and clearly identify any unresolved configuration requirement. Do not simulate a successful integration.
+
+Ensure the database schema, backend functions, frontend screens, authentication, payments, notifications and dashboards work together as one coherent application.
+
+The final system must use:
+- Samley branding.
+- Deep orange and white design.
+- Montserrat typography.
+- Supabase as the database and backend.
+- Moolre for payment processing.
+- SMS for transactional notifications.
+- PWA functionality.
+- Responsive, animated dashboard sidebars.
+
+**Build only the functionality defined in this specification. Do not implement employee or staff management in this release.**

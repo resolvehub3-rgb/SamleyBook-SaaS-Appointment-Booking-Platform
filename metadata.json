@@ -1,0 +1,6 @@
+{
+  "name": "Samley — SaaS Appointment Booking Platform",
+  "description": "Multi-tenant SaaS appointment-booking platform by SamTeck Digital for salons, barbershops, spas, wellness, and appointment-based businesses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

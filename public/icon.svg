@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#ea580c"/>
+  <!-- Stylized calendar/appointment icon with "S" curve -->
+  <rect x="96" y="128" width="320" height="288" rx="40" fill="white" fill-opacity="0.15"/>
+  <rect x="112" y="144" width="288" height="256" rx="28" fill="white"/>
+  <!-- Calendar Header Band -->
+  <path d="M112 172C112 156.536 124.536 144 140 144H372C387.464 144 400 156.536 400 172V220H112V172Z" fill="#ea580c"/>
+  <!-- Rings -->
+  <rect x="168" y="104" width="24" height="64" rx="12" fill="#c2410c"/>
+  <rect x="320" y="104" width="24" height="64" rx="12" fill="#c2410c"/>
+  <!-- Samley S & Checkmark Monogram in Calendar body -->
+  <path d="M200 270C200 250 220 240 256 240C292 240 312 255 312 275C312 305 200 300 200 335C200 355 220 370 256 370C292 370 312 355 312 335" stroke="#ea580c" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Clock Dot -->
+  <circle cx="340" cy="182" r="10" fill="white"/>
+</svg>
