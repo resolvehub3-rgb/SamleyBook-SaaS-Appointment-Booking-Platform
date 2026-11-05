@@ -41,12 +41,14 @@ export default async function handler(req: any, res: any) {
     .maybeSingle();
 
   // Process pending reminder records that are due
+  const nowIso = new Date().toISOString();
   const { data: reminders, error } = await supabase
     .from('sms_notifications')
-    .select('id, business_id, appointment_id, recipient, message, idempotency_key, submission_status, delivery_status, metadata, scheduled_for')
+    .select('id, business_id, appointment_id, recipient, message, idempotency_key, submission_status, delivery_status, metadata, scheduled_for, retry_count, next_retry_at')
     .eq('notification_type', 'appointment_reminder')
-    .eq('submission_status', 'pending')
-    .lte('scheduled_for', new Date().toISOString())
+    .in('submission_status', ['pending', 'failed'])
+    .lte('scheduled_for', nowIso)
+    .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
     .limit(50);
 
   if (error) {
@@ -63,13 +65,18 @@ export default async function handler(req: any, res: any) {
       continue;
     }
 
+    if ((reminder.retry_count || 0) >= 3) {
+      skipped++;
+      continue;
+    }
+
     const { data: appointment } = await supabase
       .from('appointments')
       .select('id, business_id, customer_name, customer_phone, appointment_date, appointment_time, status, business:businesses(name)')
       .eq('id', reminder.appointment_id)
       .single();
 
-    if (!appointment || appointment.status === 'cancelled' || appointment.status === 'canceled') {
+    if (!appointment || appointment.status === 'cancelled' || appointment.status === 'canceled' || appointment.status === 'completed') {
       await supabase
         .from('sms_notifications')
         .update({
@@ -135,6 +142,8 @@ export default async function handler(req: any, res: any) {
         delivery_status: result.ok ? 'queued' : 'failed',
         sasusync_task_id: result.taskId,
         error_details: result.error,
+        retry_count: result.ok ? reminder.retry_count : (reminder.retry_count || 0) + 1,
+        next_retry_at: result.ok ? null : new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', reminder.id);

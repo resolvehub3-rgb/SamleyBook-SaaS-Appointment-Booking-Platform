@@ -599,4 +599,64 @@ WHERE LOWER(email) = 'samleybook@gmail.com';
 UPDATE public.profiles
 SET role = 'super_admin'
 WHERE LOWER(email) = 'samleybook@gmail.com';
+
+-- =====================================================================
+-- SMS FEEDBACK, TOKENS & PER-BUSINESS USAGE (appended)
+-- =====================================================================
+ALTER TABLE public.sms_notifications
+  ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS public.feedback_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token TEXT NOT NULL UNIQUE,
+  business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+  appointment_id UUID NOT NULL REFERENCES public.appointments(id) ON DELETE CASCADE UNIQUE,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  expires_at TIMESTAMPTZ,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.customer_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+  appointment_id UUID NOT NULL REFERENCES public.appointments(id) ON DELETE CASCADE UNIQUE,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  feedback_token_id UUID REFERENCES public.feedback_tokens(id) ON DELETE SET NULL,
+  customer_name TEXT NOT NULL,
+  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
+  feedback TEXT NOT NULL,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.business_sms_usage (
+  business_id UUID PRIMARY KEY REFERENCES public.businesses(id) ON DELETE CASCADE,
+  total_sent INTEGER NOT NULL DEFAULT 0,
+  total_accepted INTEGER NOT NULL DEFAULT 0,
+  total_delivered INTEGER NOT NULL DEFAULT 0,
+  total_failed INTEGER NOT NULL DEFAULT 0,
+  last_sms_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.feedback_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customer_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_sms_usage ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Super admins manage feedback tokens" ON public.feedback_tokens FOR ALL TO authenticated
+  USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+CREATE POLICY "Owners view own feedback tokens" ON public.feedback_tokens FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = feedback_tokens.business_id AND b.owner_id = auth.uid()));
+
+CREATE POLICY "Super admins manage customer feedback" ON public.customer_feedback FOR ALL TO authenticated
+  USING (public.is_super_admin()) WITH CHECK (public.is_super_admin());
+CREATE POLICY "Owners view own customer feedback" ON public.customer_feedback FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = customer_feedback.business_id AND b.owner_id = auth.uid()));
+
+CREATE POLICY "Super admins view business sms usage" ON public.business_sms_usage FOR SELECT TO authenticated
+  USING (public.is_super_admin());
+CREATE POLICY "Owners view own business sms usage" ON public.business_sms_usage FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = business_sms_usage.business_id AND b.owner_id = auth.uid()));
 `;

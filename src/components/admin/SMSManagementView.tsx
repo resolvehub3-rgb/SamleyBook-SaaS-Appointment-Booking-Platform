@@ -511,9 +511,10 @@ export const SMSManagementView: React.FC = () => {
               <option value="queued">Queued</option>
               <option value="sent">Sent</option>
               <option value="expired">Expired</option>
-              <option value="business_registration">Registration</option>
+              <option value="business_registration">Account Approval</option>
               <option value="booking_confirmation">Booking</option>
               <option value="appointment_reminder">Reminder</option>
+              <option value="feedback_invitation">Feedback Invitation</option>
               <option value="test_sms">Test</option>
             </select>
           </div>

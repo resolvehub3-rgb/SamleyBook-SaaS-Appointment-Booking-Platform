@@ -137,8 +137,22 @@ export function verifyWebhookSignature(rawBody: string, signature: string | unde
   }
 }
 
-export function businessRegistrationMessage(businessName: string): string {
-  return `Welcome to SamleyBook! Your business "${businessName}" has been registered successfully. Start receiving bookings via your unique QR code. - SamleyBook`;
+export function businessRegistrationMessage(businessName: string, loginLink?: string): string {
+  const link = loginLink || process.env.VITE_APP_URL || '';
+  return `Congratulations! Your business ${businessName} has been approved on SamleyBook. Your account is now ready. Log in to manage your business and appointments: ${link}. SamleyBook by SamTeck Digital.`;
+}
+
+export function accountApprovalMessage(businessName: string, loginLink: string): string {
+  return `Congratulations! Your business ${businessName} has been approved on SamleyBook. Your account is now ready. Log in to manage your business and appointments: ${loginLink}. SamleyBook by SamTeck Digital.`;
+}
+
+export function feedbackInvitationMessage(params: {
+  customerName: string;
+  businessName: string;
+  service: string;
+  feedbackLink: string;
+}): string {
+  return `Hello ${params.customerName}, thank you for visiting ${params.businessName} for your ${params.service} appointment. We would appreciate your feedback about our service. Please share your experience here: ${params.feedbackLink}. Thank you for choosing SamleyBook.`;
 }
 
 export function bookingConfirmationMessage(params: {

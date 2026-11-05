@@ -6,10 +6,19 @@ import {
   businessRegistrationMessage,
   bookingConfirmationMessage,
   appointmentReminderMessage,
+  accountApprovalMessage,
+  feedbackInvitationMessage,
 } from '../_lib/sms.js';
+import crypto from 'node:crypto';
 
 interface SendBody {
-  type: 'business_registration' | 'booking_confirmation' | 'appointment_reminder' | 'test_sms';
+  type:
+    | 'business_registration'
+    | 'account_approval'
+    | 'booking_confirmation'
+    | 'appointment_reminder'
+    | 'feedback_invitation'
+    | 'test_sms';
   businessId?: string;
   appointmentId?: string;
   recipient?: string;
@@ -95,7 +104,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (type === 'business_registration') {
+    if (type === 'business_registration' || type === 'account_approval') {
       if (!authUser) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -392,6 +401,169 @@ export default async function handler(req: any, res: any) {
         .eq('id', record.id);
 
       res.status(result.ok ? 200 : 502).json({ ok: result.ok, taskId: result.taskId, error: result.error });
+      return;
+    }
+
+    if (type === 'feedback_invitation') {
+      if (!body.appointmentId) {
+        res.status(400).json({ error: 'Missing appointmentId' });
+        return;
+      }
+
+      // Optional auth: verify caller owns the business
+      let authUser: { id: string } | null = null;
+      if (token) {
+        const { data } = await supabase.auth.getUser(token);
+        if (data?.user) authUser = { id: data.user.id };
+      }
+
+      const { data: appointment, error } = await supabase
+        .from('appointments')
+        .select('id, business_id, customer_id, customer_name, customer_phone, status, service_id, service:services(name), business:businesses(name, owner_id)')
+        .eq('id', body.appointmentId)
+        .single();
+
+      if (error || !appointment) {
+        res.status(404).json({ error: 'Appointment not found' });
+        return;
+      }
+
+      if (appointment.status !== 'completed') {
+        res.status(200).json({ ok: true, skipped: true, reason: 'Appointment not completed' });
+        return;
+      }
+
+      // Auth check
+      if (authUser) {
+        const ownerId = (appointment as any).business?.owner_id;
+        if (ownerId && ownerId !== authUser.id) {
+          res.status(403).json({ error: 'Access denied' });
+          return;
+        }
+      }
+
+      const businessName = (appointment as any).business?.name || 'your business';
+      const serviceName = (appointment as any).service?.name || 'your service';
+      const recipient = normalizePhone(body.recipient || appointment.customer_phone || '');
+      if (!recipient) {
+        res.status(400).json({ error: 'No valid recipient phone' });
+        return;
+      }
+
+      const idempotencyKey = `feedback_invitation:${appointment.id}`;
+
+      const { data: existing } = await supabase
+        .from('sms_notifications')
+        .select('id, submission_status, sasusync_task_id')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (existing && existing.submission_status === 'accepted') {
+        res.status(200).json({ ok: true, duplicate: true, taskId: existing.sasusync_task_id });
+        return;
+      }
+
+      // Generate or reuse feedback token
+      let tokenRow: { token: string } | null = null;
+      const { data: existingToken } = await supabase
+        .from('feedback_tokens')
+        .select('token, used_at, expires_at')
+        .eq('appointment_id', appointment.id)
+        .maybeSingle();
+
+      if (existingToken && !existingToken.used_at) {
+        tokenRow = { token: existingToken.token };
+      } else if (!existingToken) {
+        const newToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: insertedToken, error: tokenErr } = await supabase
+          .from('feedback_tokens')
+          .insert({
+            token: newToken,
+            business_id: appointment.business_id,
+            appointment_id: appointment.id,
+            customer_id: appointment.customer_id || null,
+            expires_at: expiresAt,
+          })
+          .select('token')
+          .single();
+        if (tokenErr) {
+          // Race: token may have been created concurrently; fetch it
+          const { data: raced } = await supabase
+            .from('feedback_tokens')
+            .select('token, used_at')
+            .eq('appointment_id', appointment.id)
+            .maybeSingle();
+          if (raced && !raced.used_at) {
+            tokenRow = { token: raced.token };
+          } else if (raced && raced.used_at) {
+            res.status(200).json({ ok: true, skipped: true, reason: 'Feedback already submitted' });
+            return;
+          } else {
+            throw tokenErr;
+          }
+        } else {
+          tokenRow = insertedToken as { token: string };
+        }
+      } else {
+        // token used; skip sending another invitation
+        res.status(200).json({ ok: true, skipped: true, reason: 'Feedback already submitted' });
+        return;
+      }
+
+      const rawUrl = process.env.APP_URL || process.env.VITE_APP_URL || '';
+      const appUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+      const feedbackLink = `${appUrl}/feedback/${tokenRow!.token}`;
+
+      const message = feedbackInvitationMessage({
+        customerName: appointment.customer_name,
+        businessName,
+        service: serviceName,
+        feedbackLink,
+      });
+
+      const { data: record, error: insertError } = await supabase
+        .from('sms_notifications')
+        .upsert(
+          {
+            business_id: appointment.business_id,
+            appointment_id: appointment.id,
+            customer_id: appointment.customer_id || null,
+            notification_type: 'feedback_invitation',
+            recipient,
+            message,
+            idempotency_key: idempotencyKey,
+            submission_status: 'pending',
+            delivery_status: 'queued',
+            metadata: { appointmentId: appointment.id, type, feedbackLink },
+          },
+          { onConflict: 'idempotency_key' }
+        )
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+
+      const result = await sendSasuSyncSms({
+        sender: process.env.SASUSYNC_SENDER_ID || 'SamleyBook',
+        recipients: recipient,
+        message,
+        metadata: { appointmentId: appointment.id, type },
+        idempotencyKey,
+      });
+
+      await supabase
+        .from('sms_notifications')
+        .update({
+          submission_status: result.ok ? 'accepted' : 'failed',
+          delivery_status: result.ok ? 'queued' : 'failed',
+          sasusync_task_id: result.taskId,
+          error_details: result.error,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', record.id);
+
+      res.status(result.ok ? 200 : 502).json({ ok: result.ok, taskId: result.taskId, error: result.error, feedbackLink });
       return;
     }
 

@@ -40,6 +40,8 @@ export const AppointmentsView: React.FC = () => {
       const supabase = getSupabase();
       if (!supabase) return;
 
+      const oldStatus = appointments.find((a) => a.id === apptId)?.status;
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: newStatus })
@@ -51,6 +53,26 @@ export const AppointmentsView: React.FC = () => {
         await refreshBusinessData();
         if (selectedAppt?.id === apptId) {
           setSelectedAppt((prev) => (prev ? { ...prev, status: newStatus } : null));
+        }
+
+        // Trigger feedback invitation SMS when marked completed
+        if (newStatus === 'completed' && oldStatus !== 'completed') {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetch('/api/sms/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+              },
+              body: JSON.stringify({
+                type: 'feedback_invitation',
+                appointmentId: apptId,
+              }),
+            });
+          } catch (smsErr) {
+            console.warn('Feedback invitation SMS trigger failed:', smsErr);
+          }
         }
       }
     } catch (err) {
@@ -67,22 +89,26 @@ export const AppointmentsView: React.FC = () => {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      const messageText = `Reminder: Your appointment with ${currentBusiness.name} is scheduled for ${appt.appointment_date} at ${appt.appointment_time}. We look forward to seeing you.`;
-
-      const { error } = await supabase.from('sms_logs').insert({
-        business_id: currentBusiness.id,
-        recipient_phone: appt.customer_phone,
-        message_type: 'reminder_24h',
-        message_text: messageText,
-        delivery_status: 'sent',
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          type: 'appointment_reminder',
+          appointmentId: appt.id,
+          recipient: appt.customer_phone,
+        }),
       });
-
-      if (error) {
-        setSmsActionMsg(`Failed to log SMS: ${error.message}`);
+      const data = await res.json();
+      if (data.ok || data.skipped || data.duplicate) {
+        setSmsActionMsg(`SMS reminder sent to ${appt.customer_phone}.`);
       } else {
-        setSmsActionMsg(`SMS Reminder queued & logged to ${appt.customer_phone}!`);
-        setTimeout(() => setSmsActionMsg(null), 4000);
+        setSmsActionMsg(data.error || 'Failed to send reminder.');
       }
+      setTimeout(() => setSmsActionMsg(null), 4000);
     } catch (err) {
       setSmsActionMsg(err instanceof Error ? err.message : 'SMS send error');
     } finally {

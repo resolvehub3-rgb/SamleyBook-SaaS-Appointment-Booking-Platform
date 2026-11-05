@@ -9,6 +9,7 @@ import { DashboardLayout, DashboardTab } from './components/dashboard/DashboardL
 import { OverviewView } from './components/dashboard/OverviewView';
 import { ServicesView } from './components/dashboard/ServicesView';
 import { AppointmentsView } from './components/dashboard/AppointmentsView';
+import { FeedbackView } from './components/dashboard/FeedbackView';
 import { CustomersView } from './components/dashboard/CustomersView';
 import { PaymentsView } from './components/dashboard/PaymentsView';
 import { PaymentConfigView } from './components/dashboard/PaymentConfigView';
@@ -19,6 +20,7 @@ import { SettingsView } from './components/dashboard/SettingsView';
 import { CreateBusinessModal } from './components/dashboard/CreateBusinessModal';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { PublicBookingPage } from './components/booking/PublicBookingPage';
+import { FeedbackPage } from './components/feedback/FeedbackPage';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { DatabaseSetupBanner } from './components/common/DatabaseSetupBanner';
 
@@ -59,6 +61,18 @@ function AppRouter() {
       <>
         <DatabaseSetupBanner />
         <PublicBookingPage businessSlug={slug} />
+        <OfflineIndicator />
+      </>
+    );
+  }
+
+  // 1b. PUBLIC FEEDBACK PAGE: /feedback/:token
+  if (currentPath.startsWith('/feedback/')) {
+    const token = currentPath.replace('/feedback/', '').split('/')[0];
+    return (
+      <>
+        <DatabaseSetupBanner />
+        <FeedbackPage token={token} />
         <OfflineIndicator />
       </>
     );
@@ -141,6 +155,8 @@ function AppRouter() {
           return <ServicesView />;
         case 'appointments':
           return <AppointmentsView />;
+        case 'feedback':
+          return <FeedbackView />;
         case 'customers':
           return <CustomersView />;
         case 'payments':

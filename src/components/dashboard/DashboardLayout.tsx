@@ -16,6 +16,7 @@ import {
   Plus,
   Clock,
   ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
@@ -34,6 +35,7 @@ export type DashboardTab =
   | 'booking-page'
   | 'subscription'
   | 'business-profile'
+  | 'feedback'
   | 'settings';
 
 interface Props {
@@ -68,6 +70,7 @@ export const DashboardLayout: React.FC<Props> = ({
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'services', label: 'Services', icon: Scissors },
     { id: 'appointments', label: 'Appointments', icon: Calendar, badge: pendingCount > 0 ? pendingCount : null },
+    { id: 'feedback', label: 'Customer Feedback', icon: MessageSquare },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'payment-config', label: 'Payment Configuration', icon: Settings },
