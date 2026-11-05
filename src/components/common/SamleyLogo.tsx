@@ -24,7 +24,9 @@ export const SamleyLogo: React.FC<Props> = ({
       <img
         src="/Logo.png"
         alt="SamleyBook"
-        className={`${heights[size]} w-auto object-contain select-none`}
+        className={`${heights[size]} w-auto object-contain select-none ${
+          light ? 'bg-white rounded-lg p-1' : 'mix-blend-multiply'
+        }`}
       />
       {showAttribution && (
         <span
