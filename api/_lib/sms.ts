@@ -101,6 +101,31 @@ export async function sendSasuSyncSms(input: SendSmsInput): Promise<SendSmsResul
   }
 }
 
+export async function fetchSasuSyncStatus(taskId: string): Promise<string | null> {
+  const apiKey = process.env.SASUSYNC_API_KEY;
+  if (!apiKey || !taskId) return null;
+  const base = getSasuSyncEndpoint();
+  // Derive status URL from send endpoint host
+  let statusUrl = base.replace(/\/[^/]*\/send\/?$/, '/api/v1/status/') + encodeURIComponent(taskId);
+  // Fallback if replacement didn't work
+  if (!statusUrl.includes('/status/')) {
+    statusUrl = base.replace(/\/send\/?$/, '').replace(/\/smssandbox\/v1$/, '/api/v1') + '/status/' + encodeURIComponent(taskId);
+  }
+  try {
+    const res = await fetch(statusUrl, { headers: { 'X-API-Key': apiKey } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (
+      data?.data?.messages?.[0]?.message_id ||
+      data?.data?.message_id ||
+      data?.message_id ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function verifyWebhookSignature(rawBody: string, signature: string | undefined, secret: string): boolean {
   if (!signature || !secret) return false;
   const expected = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');

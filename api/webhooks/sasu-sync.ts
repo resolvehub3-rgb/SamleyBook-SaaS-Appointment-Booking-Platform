@@ -57,24 +57,38 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const messageId =
+    payload?.data?.message_id || payload?.message_id || payload?.messageId || null;
   const taskId =
     payload?.task_id || payload?.taskId || payload?.data?.task_id || null;
   const incomingStatus = String(
     payload?.status || payload?.event || payload?.delivery_status || ''
   ).toLowerCase();
 
-  if (!taskId) {
-    res.status(400).json({ error: 'Missing task_id' });
+  if (!messageId && !taskId) {
+    res.status(400).json({ error: 'Missing message_id/task_id' });
     return;
   }
 
   const supabase = getServiceSupabase();
 
-  const { data: record } = await supabase
-    .from('sms_notifications')
-    .select('id, delivery_status')
-    .eq('sasusync_task_id', taskId)
-    .maybeSingle();
+  let record: { id: string; delivery_status: string | null } | null = null;
+  if (messageId) {
+    const { data } = await supabase
+      .from('sms_notifications')
+      .select('id, delivery_status')
+      .eq('sasusync_message_id', messageId)
+      .maybeSingle();
+    record = data;
+  }
+  if (!record && taskId) {
+    const { data } = await supabase
+      .from('sms_notifications')
+      .select('id, delivery_status')
+      .eq('sasusync_task_id', taskId)
+      .maybeSingle();
+    record = data;
+  }
 
   if (!record) {
     // Acknowledge to avoid retries for unknown records

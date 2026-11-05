@@ -9,6 +9,7 @@ create table if not exists public.sms_notifications (
   recipient text not null,
   message text not null default '',
   sasusync_task_id text,
+  sasusync_message_id text,
   idempotency_key text not null unique,
   submission_status text not null default 'pending',
   delivery_status text not null default 'queued',
@@ -22,6 +23,7 @@ create table if not exists public.sms_notifications (
 create index if not exists idx_sms_notifications_business_id on public.sms_notifications(business_id);
 create index if not exists idx_sms_notifications_appointment_id on public.sms_notifications(appointment_id);
 create index if not exists idx_sms_notifications_task_id on public.sms_notifications(sasusync_task_id);
+create index if not exists idx_sms_notifications_message_id on public.sms_notifications(sasusync_message_id);
 create index if not exists idx_sms_notifications_scheduled_for on public.sms_notifications(scheduled_for);
 
 -- updated_at trigger

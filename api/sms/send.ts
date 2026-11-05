@@ -1,6 +1,7 @@
 import { getServiceSupabase } from '../_lib/supabase.js';
 import {
   sendSasuSyncSms,
+  fetchSasuSyncStatus,
   normalizePhone,
   businessRegistrationMessage,
   bookingConfirmationMessage,
@@ -125,12 +126,15 @@ export default async function handler(req: any, res: any) {
         idempotencyKey,
       });
 
+      const messageId = result.ok && result.taskId ? await fetchSasuSyncStatus(result.taskId) : null;
+
       await supabase
         .from('sms_notifications')
         .update({
           submission_status: result.ok ? 'accepted' : 'failed',
           delivery_status: result.ok ? 'queued' : 'failed',
           sasusync_task_id: result.taskId,
+          sasusync_message_id: messageId,
           error_details: result.error,
           updated_at: new Date().toISOString(),
         })
@@ -220,12 +224,15 @@ export default async function handler(req: any, res: any) {
         idempotencyKey,
       });
 
+      const messageId = result.ok && result.taskId ? await fetchSasuSyncStatus(result.taskId) : null;
+
       await supabase
         .from('sms_notifications')
         .update({
           submission_status: result.ok ? 'accepted' : 'failed',
           delivery_status: result.ok ? 'queued' : 'failed',
           sasusync_task_id: result.taskId,
+          sasusync_message_id: messageId,
           error_details: result.error,
           updated_at: new Date().toISOString(),
         })
@@ -313,12 +320,15 @@ export default async function handler(req: any, res: any) {
         idempotencyKey,
       });
 
+      const messageId = result.ok && result.taskId ? await fetchSasuSyncStatus(result.taskId) : null;
+
       await supabase
         .from('sms_notifications')
         .update({
           submission_status: result.ok ? 'accepted' : 'failed',
           delivery_status: result.ok ? 'queued' : 'failed',
           sasusync_task_id: result.taskId,
+          sasusync_message_id: messageId,
           error_details: result.error,
           updated_at: new Date().toISOString(),
         })
