@@ -144,5 +144,16 @@ create policy "Owners view own business sms usage"
   on public.business_sms_usage for select to authenticated
   using (exists (select 1 from public.businesses b where b.id = business_sms_usage.business_id and b.owner_id = auth.uid()));
 
--- Realtime for feedback
-alter publication supabase_realtime add table public.customer_feedback;
+-- Realtime for feedback (idempotent)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'customer_feedback'
+  ) then
+    alter publication supabase_realtime add table public.customer_feedback;
+  end if;
+end
+$$;
