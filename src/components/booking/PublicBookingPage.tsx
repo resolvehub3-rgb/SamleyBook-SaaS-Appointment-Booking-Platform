@@ -265,15 +265,20 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
         },
       });
 
-      // 4. Log customer booking confirmation SMS
-      const smsMessage = `Hello ${customerName.trim()}, your appointment booking with ${business.name} for ${selectedService.name} has been successfully submitted for ${selectedDate} at ${selectedSlot}. Thank you.`;
-      await supabase.from('sms_logs').insert({
-        business_id: business.id,
-        recipient_phone: customerPhone.trim(),
-        message_type: 'booking_confirmation',
-        message_text: smsMessage,
-        delivery_status: 'sent',
-      });
+      // 4. Trigger booking confirmation SMS via backend (SasuSync)
+      try {
+        await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'booking_confirmation',
+            appointmentId: newAppt.id,
+            recipient: customerPhone.trim(),
+          }),
+        });
+      } catch (smsErr) {
+        console.warn('Booking SMS trigger failed:', smsErr);
+      }
 
       // 5. Log customer confirmation email
       if (customerEmail.trim()) {

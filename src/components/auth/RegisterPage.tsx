@@ -188,15 +188,24 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
         mobile_money_number: businessPhone.trim(),
       });
 
-      // 7. Log registration confirmation SMS
-      const dashboardUrl = `${window.location.origin}/dashboard`;
-      await supabase.from('sms_logs').insert({
-        business_id: businessData.id,
-        recipient_phone: personalPhone.trim(),
-        message_type: 'registration',
-        message_text: `Welcome to SamleyBook! Your business "${businessName}" has been successfully registered. Your 7-day free trial is now active. You can access your business dashboard here: ${dashboardUrl}. Thank you for choosing SamleyBook.`,
-        delivery_status: 'sent',
-      });
+      // 7. Trigger registration confirmation SMS via backend (SasuSync)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({
+            type: 'business_registration',
+            businessId: businessData.id,
+            recipient: businessPhone.trim(),
+          }),
+        });
+      } catch (smsErr) {
+        console.warn('Registration SMS trigger failed:', smsErr);
+      }
 
       // 8. Log registration confirmation email
       await supabase.from('email_logs').insert({
