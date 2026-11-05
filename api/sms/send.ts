@@ -9,11 +9,29 @@ import {
 } from '../_lib/sms.js';
 
 interface SendBody {
-  type: 'business_registration' | 'booking_confirmation' | 'appointment_reminder';
+  type: 'business_registration' | 'booking_confirmation' | 'appointment_reminder' | 'test_sms';
   businessId?: string;
   appointmentId?: string;
   recipient?: string;
   variables?: Record<string, string>;
+}
+
+async function getTemplate(supabase: any, key: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('sms_templates')
+    .select('content, is_enabled')
+    .eq('template_key', key)
+    .maybeSingle();
+  if (data && data.is_enabled) return data.content;
+  return null;
+}
+
+function renderTemplate(content: string, vars: Record<string, string>): string {
+  let msg = content;
+  for (const [k, v] of Object.entries(vars)) {
+    msg = msg.replace(new RegExp(`\\\\[${k.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\\\]`, 'g'), v || '');
+  }
+  return msg;
 }
 
 async function readJson(req: any): Promise<any> {
@@ -43,6 +61,27 @@ export default async function handler(req: any, res: any) {
   const { type } = body;
   if (!type) {
     res.status(400).json({ error: 'Missing type' });
+    return;
+  }
+
+  // Enforce global SMS enable/disable
+  const { data: settings } = await supabase
+    .from('sms_platform_settings')
+    .select('sms_enabled')
+    .limit(1)
+    .maybeSingle();
+
+  if (settings && settings.sms_enabled === false) {
+    await supabase.from('sms_notifications').insert({
+      notification_type: type,
+      recipient: body.recipient || '',
+      message: '',
+      idempotency_key: `${type}:disabled:${Date.now()}`,
+      submission_status: 'skipped',
+      delivery_status: 'disabled',
+      metadata: body || {},
+    });
+    res.status(200).json({ ok: false, skipped: true, reason: 'SMS sending disabled' });
     return;
   }
 
@@ -96,7 +135,12 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
-      const message = businessRegistrationMessage(business.name);
+      const template = await getTemplate(supabase, 'business_registration');
+      const vars = {
+        'Business Name': business.name,
+        'Dashboard Link': body.variables?.['Dashboard Link'] || process.env.VITE_APP_URL || '',
+      };
+      const message = template ? renderTemplate(template, vars) : businessRegistrationMessage(business.name);
 
       const { data: record, error: insertError } = await supabase
         .from('sms_notifications')
@@ -187,7 +231,14 @@ export default async function handler(req: any, res: any) {
       }
 
       const businessName = (appointment as any).business?.name || 'your business';
-      const message = bookingConfirmationMessage({
+      const template = await getTemplate(supabase, 'booking_confirmation');
+      const vars = {
+        'Customer Name': appointment.customer_name,
+        'Business Name': businessName,
+        'Appointment Date': appointment.appointment_date,
+        'Appointment Time': appointment.appointment_time,
+      };
+      const message = template ? renderTemplate(template, vars) : bookingConfirmationMessage({
         businessName,
         customerName: appointment.customer_name,
         date: appointment.appointment_date,
@@ -284,7 +335,13 @@ export default async function handler(req: any, res: any) {
       }
 
       const businessName = (appointment as any).business?.name || 'your business';
-      const message = appointmentReminderMessage({
+      const template = await getTemplate(supabase, 'appointment_reminder');
+      const vars = {
+        'Customer Name': appointment.customer_name,
+        'Business Name': businessName,
+        'Appointment Time': appointment.appointment_time,
+      };
+      const message = template ? renderTemplate(template, vars) : appointmentReminderMessage({
         businessName,
         customerName: appointment.customer_name,
         date: appointment.appointment_date,

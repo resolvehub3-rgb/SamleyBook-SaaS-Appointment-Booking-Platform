@@ -22,6 +22,24 @@ export default async function handler(req: any, res: any) {
 
   const supabase = getServiceSupabase();
 
+  // Respect global SMS toggle
+  const { data: settings } = await supabase
+    .from('sms_platform_settings')
+    .select('sms_enabled')
+    .limit(1)
+    .maybeSingle();
+  if (settings && settings.sms_enabled === false) {
+    res.status(200).json({ ok: true, processed: 0, skipped: 0, reason: 'SMS disabled' });
+    return;
+  }
+
+  // Load reminder template
+  const { data: template } = await supabase
+    .from('sms_templates')
+    .select('content, is_enabled')
+    .eq('template_key', 'appointment_reminder')
+    .maybeSingle();
+
   // Process pending reminder records that are due
   const { data: reminders, error } = await supabase
     .from('sms_notifications')
@@ -81,15 +99,24 @@ export default async function handler(req: any, res: any) {
     }
 
     const businessName = (appointment as any).business?.name || 'your business';
-    const message =
+    let message =
       reminder.message && reminder.message !== 'PENDING'
         ? reminder.message
-        : appointmentReminderMessage({
-            businessName,
-            customerName: appointment.customer_name,
-            date: appointment.appointment_date,
-            time: appointment.appointment_time,
-          });
+        : null;
+    if (!message && template && template.is_enabled) {
+      message = template.content
+        .replace(/\\[Customer Name\\]/g, appointment.customer_name || '')
+        .replace(/\\[Business Name\\]/g, businessName)
+        .replace(/\\[Appointment Time\\]/g, appointment.appointment_time || '');
+    }
+    if (!message) {
+      message = appointmentReminderMessage({
+        businessName,
+        customerName: appointment.customer_name,
+        date: appointment.appointment_date,
+        time: appointment.appointment_time,
+      });
+    }
 
     const result = await sendSasuSyncSms({
       sender: process.env.SASUSYNC_SENDER_ID || 'SamleyBook',

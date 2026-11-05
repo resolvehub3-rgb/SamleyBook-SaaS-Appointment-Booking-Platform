@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Database,
+  MessageSquare,
   Plus,
   RefreshCw,
   Copy,
@@ -24,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getSupabase } from '../../lib/supabase';
 import { formatGHS, calculateTrialRemainingDays } from '../../utils/booking-logic';
 import { SamleyLogo } from '../common/SamleyLogo';
+import { SMSManagementView } from './SMSManagementView';
 import { SUPABASE_SQL_SCHEMA } from '../../lib/sqlScript';
 import {
   Business,
@@ -38,6 +40,7 @@ export type AdminTab =
   | 'subscriptions'
   | 'plans'
   | 'payments'
+  | 'sms'
   | 'settings';
 
 interface Props {
@@ -267,6 +270,7 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigateHome }) => {
     { id: 'subscriptions', label: 'Subscriptions', icon: Sparkles, count: trialBusinesses },
     { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
     { id: 'payments', label: 'Payment Records', icon: CreditCard },
+    { id: 'sms', label: 'SMS Management', icon: MessageSquare },
     { id: 'settings', label: 'Platform Settings & SQL', icon: Database },
   ];
 
@@ -1256,6 +1260,11 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigateHome }) => {
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB: SMS MANAGEMENT */}
+          {currentTab === 'sms' && (
+            <SMSManagementView />
           )}
 
           {/* TAB: PLATFORM SETTINGS & SQL SETUP */}
