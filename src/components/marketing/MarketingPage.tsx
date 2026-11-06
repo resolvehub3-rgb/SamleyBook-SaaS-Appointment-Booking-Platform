@@ -527,10 +527,10 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
                   <div>
                     <p className="font-bold text-zinc-900">Email Address</p>
                     <a
-                      href="mailto:contact@samteckdigital.com"
+                      href="mailto:samteckdigital@gmail.com"
                       className="text-zinc-600 hover:text-orange-600"
                     >
-                      contact@samteckdigital.com
+                      samteckdigital@gmail.com
                     </a>
                   </div>
                 </div>
@@ -541,7 +541,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
                   </div>
                   <div>
                     <p className="font-bold text-zinc-900">Phone & WhatsApp</p>
-                    <span className="text-zinc-600">+233 (0) 50 123 4567 / +233 (0) 24 000 0000</span>
+                    <span className="text-zinc-600">+233 (0) 59 434 5424 / +233 (0) 57 220 7831</span>
                   </div>
                 </div>
 
@@ -551,7 +551,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
                   </div>
                   <div>
                     <p className="font-bold text-zinc-900">Office Location</p>
-                    <span className="text-zinc-600">Accra, Greater Accra Region, Ghana</span>
+                    <span className="text-zinc-600">Mamprobi, Greater Accra Region, Ghana</span>
                   </div>
                 </div>
               </div>
