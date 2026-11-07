@@ -75,7 +75,7 @@ begin
   end if;
   return NEW;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 drop trigger if exists trg_appointment_reminder on public.appointments;
 create trigger trg_appointment_reminder
@@ -96,3 +96,10 @@ using (
     where p.id = auth.uid() and p.role = 'super_admin'
   )
 );
+
+drop policy if exists "System can insert sms notifications" on public.sms_notifications;
+create policy "System can insert sms notifications"
+on public.sms_notifications
+for insert
+to authenticated
+with check (true);
