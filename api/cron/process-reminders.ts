@@ -49,7 +49,7 @@ export default async function handler(req: any, res: any) {
     .in('submission_status', ['pending', 'failed'])
     .lte('scheduled_for', nowIso)
     .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
-    .limit(50);
+    .limit(10);
 
   if (error) {
     res.status(500).json({ error: error.message });

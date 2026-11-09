@@ -2,6 +2,13 @@ import crypto from 'node:crypto';
 import { getServiceSupabase } from '../_lib/supabase.js';
 import { verifyWebhookSignature } from '../_lib/sms.js';
 
+// Vercel must NOT parse the body so we can verify the raw signature.
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 async function readRawBody(req: any): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(Buffer.from(chunk));
