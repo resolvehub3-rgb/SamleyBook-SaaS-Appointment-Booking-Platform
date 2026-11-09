@@ -382,72 +382,107 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
         {/* STEP 1: SELECT SERVICE */}
         {step === 1 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-zinc-900">Select a Service</h2>
-                <p className="text-xs text-zinc-500">Choose the service you would like to book</p>
+                <h2 className="text-xl font-black text-zinc-900 tracking-tight">Choose a Service</h2>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Select the service you would like to book with {business.name}
+                </p>
               </div>
-              <span className="text-xs font-bold text-zinc-400">Step 1 of 3</span>
+              <span className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 bg-white border border-zinc-200 rounded-full px-3 py-1.5 shadow-xs">
+                Step 1 of 3
+              </span>
             </div>
 
             {services.length === 0 ? (
-              <div className="p-12 text-center bg-white rounded-3xl border border-zinc-200 shadow-xs space-y-2">
-                <Scissors className="w-8 h-8 text-zinc-300 mx-auto" />
-                <h3 className="text-sm font-bold text-zinc-900">No active services</h3>
-                <p className="text-xs text-zinc-500">
-                  This business has not published any active services yet.
+              <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-zinc-300 shadow-sm space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto">
+                  <Scissors className="w-7 h-7" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">No services available yet</h3>
+                <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+                  This business has not published any active services. Please check back soon.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {services.map((svc) => (
-                  <div
-                    key={svc.id}
-                    onClick={() => setSelectedService(svc)}
-                    className={`p-5 rounded-3xl bg-white border cursor-pointer transition-all flex flex-col justify-between ${
-                      selectedService?.id === svc.id
-                        ? 'border-orange-600 ring-2 ring-orange-100 shadow-md'
-                        : 'border-zinc-200/80 hover:border-zinc-300 shadow-xs'
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      {svc.image_url && (
-                        <img
-                          src={svc.image_url}
-                          alt={svc.name}
-                          className="w-full h-36 rounded-2xl object-cover mb-2"
-                        />
-                      )}
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-bold text-zinc-900">{svc.name}</h3>
-                        <span className="text-sm font-black text-orange-600 shrink-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {services.map((svc) => {
+                  const isSelected = selectedService?.id === svc.id;
+                  return (
+                    <article
+                      key={svc.id}
+                      onClick={() => setSelectedService(svc)}
+                      className={`group relative overflow-hidden rounded-3xl bg-white border cursor-pointer transition-all duration-300 ${
+                        isSelected
+                          ? 'border-orange-500 ring-4 ring-orange-100 shadow-xl shadow-orange-100/60 -translate-y-0.5'
+                          : 'border-zinc-200/80 hover:border-orange-200 hover:shadow-xl hover:-translate-y-1'
+                      }`}
+                    >
+                      {/* Image / gradient header */}
+                      <div className="relative h-44 overflow-hidden">
+                        {svc.image_url ? (
+                          <img
+                            src={svc.image_url}
+                            alt={svc.name}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-orange-500 via-orange-600 to-amber-500 flex items-center justify-center">
+                            <Scissors className="w-12 h-12 text-white/80" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+
+                        {/* Price badge */}
+                        <span className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur text-orange-700 text-sm font-black shadow-sm">
                           {formatGHS(svc.price)}
                         </span>
-                      </div>
-                      <p className="text-xs text-zinc-500 line-clamp-2">
-                        {svc.description || 'Professional scheduled service.'}
-                      </p>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-4 mt-3 border-t border-zinc-100">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-500">
-                        <Clock className="w-3.5 h-3.5 text-orange-600" />
-                        {svc.duration_minutes} mins
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedService(svc);
-                          setStep(2);
-                        }}
-                        className="px-3.5 py-1.5 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 transition"
-                      >
-                        Book Now
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        {/* Duration chip */}
+                        <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur text-zinc-800 text-xs font-bold shadow-sm">
+                          <Clock className="w-3.5 h-3.5 text-orange-600" />
+                          {svc.duration_minutes} mins
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-5 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="text-base font-black text-zinc-900 leading-tight">
+                            {svc.name}
+                          </h3>
+                          {isSelected && (
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center">
+                              <Check className="w-4 h-4" />
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed">
+                          {svc.description || 'Professional scheduled service tailored to your needs.'}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-4 mt-2 border-t border-zinc-100">
+                          <span className="text-xs font-semibold text-zinc-400">
+                            Tap to select
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedService(svc);
+                              setStep(2);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 active:scale-95 transition shadow-sm"
+                          >
+                            Book Now
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
