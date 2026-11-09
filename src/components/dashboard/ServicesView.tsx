@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { getSupabase, uploadBusinessAsset } from '../../lib/supabase';
-import { formatGHS } from '../../utils/booking-logic';
+import { formatGHS, formatDurationMinutes } from '../../utils/booking-logic';
 import { Service } from '../../types/database';
 
 export const ServicesView: React.FC = () => {
@@ -272,7 +272,7 @@ export const ServicesView: React.FC = () => {
 
                   <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 pt-2 border-t border-zinc-100">
                     <Clock className="w-3.5 h-3.5 text-orange-600" />
-                    <span>{svc.duration_minutes} minutes</span>
+                    <span>{formatDurationMinutes(svc.duration_minutes)}</span>
                   </div>
                 </div>
               </div>
@@ -399,6 +399,9 @@ export const ServicesView: React.FC = () => {
                     onChange={(e) => setDuration(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
+                  <p className="mt-1 text-[11px] font-semibold text-orange-600">
+                    {formatDurationMinutes(duration)}
+                  </p>
                 </div>
               </div>
 

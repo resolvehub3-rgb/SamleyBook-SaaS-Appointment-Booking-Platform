@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { getSupabase } from '../../lib/supabase';
-import { formatGHS } from '../../utils/booking-logic';
+import { formatGHS, formatDurationMinutes } from '../../utils/booking-logic';
 import { Appointment, AppointmentStatus } from '../../types/database';
 
 export const AppointmentsView: React.FC = () => {
@@ -198,7 +198,7 @@ export const AppointmentsView: React.FC = () => {
                     <td className="py-4 px-6">
                       <p className="font-bold text-zinc-800">{appt.service?.name || 'Service'}</p>
                       <p className="text-[11px] text-zinc-400">
-                        {appt.service?.duration_minutes || 30} mins
+                        {formatDurationMinutes(appt.service?.duration_minutes || 30)}
                       </p>
                     </td>
 

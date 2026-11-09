@@ -29,6 +29,7 @@ import {
   calculateEndTime,
   generateAvailableSlots,
   formatGHS,
+  formatDurationMinutes,
   isValidGhanaPhone,
   BookedSlot,
 } from '../../utils/booking-logic';
@@ -441,7 +442,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                         {/* Duration chip */}
                         <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur text-zinc-800 text-xs font-bold shadow-sm">
                           <Clock className="w-3.5 h-3.5 text-orange-600" />
-                          {svc.duration_minutes} mins
+                          {formatDurationMinutes(svc.duration_minutes)}
                         </span>
                       </div>
 
@@ -495,7 +496,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
               <div>
                 <h2 className="text-lg font-bold text-zinc-900">Choose Date & Time Slot</h2>
                 <p className="text-xs text-zinc-500">
-                  Selected service: <strong className="text-zinc-800">{selectedService.name}</strong> ({selectedService.duration_minutes} mins &bull; {formatGHS(selectedService.price)})
+                  Selected service: <strong className="text-zinc-800">{selectedService.name}</strong> ({formatDurationMinutes(selectedService.duration_minutes)} &bull; {formatGHS(selectedService.price)})
                 </p>
               </div>
               <span className="text-xs font-bold text-zinc-400">Step 2 of 3</span>

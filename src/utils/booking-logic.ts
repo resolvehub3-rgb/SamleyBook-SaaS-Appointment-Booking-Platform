@@ -53,6 +53,22 @@ export function formatGHS(amount: number | string | null | undefined): string {
 }
 
 /**
+ * Format a duration in minutes as "X hour(s) Y minute(s)".
+ * e.g. 30 -> "30 minutes", 60 -> "1 hour", 100 -> "1 hour 40 minutes"
+ */
+export function formatDurationMinutes(minutes: number | string | null | undefined): string {
+  const num = typeof minutes === 'number' ? minutes : Number(minutes || 0);
+  if (isNaN(num) || num <= 0) return '0 minutes';
+  const hours = Math.floor(num / 60);
+  const mins = Math.round(num % 60);
+  const hourLabel = hours === 1 ? 'hour' : 'hours';
+  const minLabel = mins === 1 ? 'minute' : 'minutes';
+  if (hours === 0) return `${mins} ${minLabel}`;
+  if (mins === 0) return `${hours} ${hourLabel}`;
+  return `${hours} ${hourLabel} ${mins} ${minLabel}`;
+}
+
+/**
  * Converts "HH:MM" to minutes from midnight
  */
 export function timeToMinutes(timeStr: string): number {
