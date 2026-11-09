@@ -93,7 +93,7 @@ export const DashboardLayout: React.FC<Props> = ({
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col md:flex-row text-left">
       {/* DESKTOP SIDEBAR */}
-      <aside className="hidden md:flex flex-col w-72 bg-white border-r border-zinc-200/80 shrink-0 h-screen sticky top-0 overflow-y-auto">
+      <aside className="hidden md:flex flex-col w-72 bg-white border-r border-zinc-200/80 shrink-0 h-screen sticky top-0 self-start overflow-y-auto">
         {/* Brand Header */}
         <div className="p-5 border-b border-zinc-100 flex items-center justify-between">
           <SamleyLogo size="sm" showAttribution={true} />
