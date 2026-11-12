@@ -653,10 +653,21 @@ CREATE POLICY "Authenticated users can update their business assets"
 -- =====================================================================
 -- REALTIME SUBSCRIPTIONS
 -- =====================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.businesses;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.payment_transactions;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='appointments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='businesses') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.businesses;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='services') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='payment_transactions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.payment_transactions;
+  END IF;
+END $$;
 
 -- 8. SUPER ADMIN ROLE & EMAIL CONFIRMATION ENFORCEMENT
 UPDATE auth.users
