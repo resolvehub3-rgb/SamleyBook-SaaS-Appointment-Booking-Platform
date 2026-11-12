@@ -344,36 +344,44 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Profiles Policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
     ON public.profiles FOR SELECT
     USING (auth.uid() = id OR public.is_super_admin());
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
     ON public.profiles FOR INSERT
     WITH CHECK (auth.uid() = id);
 
 -- Businesses Policies
+DROP POLICY IF EXISTS "Public can view active businesses for booking" ON public.businesses;
 CREATE POLICY "Public can view active businesses for booking"
     ON public.businesses FOR SELECT
     USING (is_active = true OR owner_id = auth.uid() OR public.is_super_admin());
 
+DROP POLICY IF EXISTS "Owners can insert their own businesses" ON public.businesses;
 CREATE POLICY "Owners can insert their own businesses"
     ON public.businesses FOR INSERT
     WITH CHECK (owner_id = auth.uid() OR public.is_super_admin());
 
+DROP POLICY IF EXISTS "Owners can update their own businesses" ON public.businesses;
 CREATE POLICY "Owners can update their own businesses"
     ON public.businesses FOR UPDATE
     USING (owner_id = auth.uid() OR public.is_super_admin());
 
+DROP POLICY IF EXISTS "Owners can delete their own businesses" ON public.businesses;
 CREATE POLICY "Owners can delete their own businesses"
     ON public.businesses FOR DELETE
     USING (owner_id = auth.uid() OR public.is_super_admin());
 
 -- Services Policies
+DROP POLICY IF EXISTS "Public can view active services of active businesses" ON public.services;
 CREATE POLICY "Public can view active services of active businesses"
     ON public.services FOR SELECT
     USING (
@@ -386,6 +394,7 @@ CREATE POLICY "Public can view active services of active businesses"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Owners can manage services of their businesses" ON public.services;
 CREATE POLICY "Owners can manage services of their businesses"
     ON public.services FOR ALL
     USING (
@@ -396,15 +405,18 @@ CREATE POLICY "Owners can manage services of their businesses"
     );
 
 -- Subscription Plans Policies
+DROP POLICY IF EXISTS "Everyone can view active plans" ON public.subscription_plans;
 CREATE POLICY "Everyone can view active plans"
     ON public.subscription_plans FOR SELECT
     USING (is_active = true OR public.is_super_admin());
 
+DROP POLICY IF EXISTS "Super Admins can manage plans" ON public.subscription_plans;
 CREATE POLICY "Super Admins can manage plans"
     ON public.subscription_plans FOR ALL
     USING (public.is_super_admin());
 
 -- Business Subscriptions Policies
+DROP POLICY IF EXISTS "Owners and Super Admins can view subscriptions" ON public.business_subscriptions;
 CREATE POLICY "Owners and Super Admins can view subscriptions"
     ON public.business_subscriptions FOR SELECT
     USING (
@@ -414,6 +426,7 @@ CREATE POLICY "Owners and Super Admins can view subscriptions"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "System and Owners can insert subscription" ON public.business_subscriptions;
 CREATE POLICY "System and Owners can insert subscription"
     ON public.business_subscriptions FOR INSERT
     WITH CHECK (
@@ -423,6 +436,7 @@ CREATE POLICY "System and Owners can insert subscription"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Owners and Admins can update subscription" ON public.business_subscriptions;
 CREATE POLICY "Owners and Admins can update subscription"
     ON public.business_subscriptions FOR UPDATE
     USING (
@@ -433,6 +447,7 @@ CREATE POLICY "Owners and Admins can update subscription"
     );
 
 -- Payment Configurations Policies
+DROP POLICY IF EXISTS "Owners and Super Admins can view payment configs" ON public.payment_configurations;
 CREATE POLICY "Owners and Super Admins can view payment configs"
     ON public.payment_configurations FOR SELECT
     USING (
@@ -442,6 +457,7 @@ CREATE POLICY "Owners and Super Admins can view payment configs"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Public can view basic payment type for booking calculation" ON public.payment_configurations;
 CREATE POLICY "Public can view basic payment type for booking calculation"
     ON public.payment_configurations FOR SELECT
     USING (
@@ -450,6 +466,7 @@ CREATE POLICY "Public can view basic payment type for booking calculation"
         )
     );
 
+DROP POLICY IF EXISTS "Owners can update payment configuration" ON public.payment_configurations;
 CREATE POLICY "Owners can update payment configuration"
     ON public.payment_configurations FOR ALL
     USING (
@@ -460,6 +477,7 @@ CREATE POLICY "Owners can update payment configuration"
     );
 
 -- Customers Policies
+DROP POLICY IF EXISTS "Owners can view and manage their business customers" ON public.customers;
 CREATE POLICY "Owners can view and manage their business customers"
     ON public.customers FOR ALL
     USING (
@@ -469,6 +487,7 @@ CREATE POLICY "Owners can view and manage their business customers"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Public booking can insert customers" ON public.customers;
 CREATE POLICY "Public booking can insert customers"
     ON public.customers FOR INSERT
     WITH CHECK (
@@ -478,6 +497,7 @@ CREATE POLICY "Public booking can insert customers"
     );
 
 -- Appointments Policies
+DROP POLICY IF EXISTS "Public can view appointment slot times to avoid double booking" ON public.appointments;
 CREATE POLICY "Public can view appointment slot times to avoid double booking"
     ON public.appointments FOR SELECT
     USING (
@@ -488,6 +508,7 @@ CREATE POLICY "Public can view appointment slot times to avoid double booking"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Public can insert bookings for active businesses" ON public.appointments;
 CREATE POLICY "Public can insert bookings for active businesses"
     ON public.appointments FOR INSERT
     WITH CHECK (
@@ -496,6 +517,7 @@ CREATE POLICY "Public can insert bookings for active businesses"
         )
     );
 
+DROP POLICY IF EXISTS "Owners can manage appointments of their business" ON public.appointments;
 CREATE POLICY "Owners can manage appointments of their business"
     ON public.appointments FOR ALL
     USING (
@@ -506,6 +528,7 @@ CREATE POLICY "Owners can manage appointments of their business"
     );
 
 -- Payment Transactions Policies
+DROP POLICY IF EXISTS "Owners and Super Admins can view transactions" ON public.payment_transactions;
 CREATE POLICY "Owners and Super Admins can view transactions"
     ON public.payment_transactions FOR SELECT
     USING (
@@ -515,6 +538,7 @@ CREATE POLICY "Owners and Super Admins can view transactions"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Public can insert payment transaction during booking" ON public.payment_transactions;
 CREATE POLICY "Public can insert payment transaction during booking"
     ON public.payment_transactions FOR INSERT
     WITH CHECK (
@@ -523,6 +547,7 @@ CREATE POLICY "Public can insert payment transaction during booking"
         )
     );
 
+DROP POLICY IF EXISTS "Owners can update payment transactions" ON public.payment_transactions;
 CREATE POLICY "Owners can update payment transactions"
     ON public.payment_transactions FOR UPDATE
     USING (
@@ -533,6 +558,7 @@ CREATE POLICY "Owners can update payment transactions"
     );
 
 -- SMS and Email Logs Policies
+DROP POLICY IF EXISTS "Owners and Super Admins can view logs" ON public.sms_logs;
 CREATE POLICY "Owners and Super Admins can view logs"
     ON public.sms_logs FOR SELECT
     USING (
@@ -543,10 +569,12 @@ CREATE POLICY "Owners and Super Admins can view logs"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "System can insert SMS logs" ON public.sms_logs;
 CREATE POLICY "System can insert SMS logs"
     ON public.sms_logs FOR INSERT
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Owners and Super Admins can view email logs" ON public.email_logs;
 CREATE POLICY "Owners and Super Admins can view email logs"
     ON public.email_logs FOR SELECT
     USING (
@@ -557,6 +585,7 @@ CREATE POLICY "Owners and Super Admins can view email logs"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "System can insert email logs" ON public.email_logs;
 CREATE POLICY "System can insert email logs"
     ON public.email_logs FOR INSERT
     WITH CHECK (true);
@@ -569,15 +598,18 @@ VALUES ('business-assets', 'business-assets', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage RLS: Public can view assets
+DROP POLICY IF EXISTS "Public can view business assets" ON storage.objects;
 CREATE POLICY "Public can view business assets"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'business-assets');
 
 -- Storage RLS: Authenticated users can upload assets
+DROP POLICY IF EXISTS "Authenticated users can upload business assets" ON storage.objects;
 CREATE POLICY "Authenticated users can upload business assets"
     ON storage.objects FOR INSERT
     WITH CHECK (bucket_id = 'business-assets' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update their business assets" ON storage.objects;
 CREATE POLICY "Authenticated users can update their business assets"
     ON storage.objects FOR UPDATE
     USING (bucket_id = 'business-assets' AND auth.role() = 'authenticated');

@@ -432,7 +432,6 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                             <Scissors className="w-12 h-12 text-white/80" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
                         {/* Price badge */}
                         <span className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur text-orange-700 text-sm font-black shadow-sm">

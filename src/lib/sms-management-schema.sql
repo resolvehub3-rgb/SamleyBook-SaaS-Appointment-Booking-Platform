@@ -35,12 +35,24 @@ values
    'Hello [Customer Name], your appointment with [Business Name] is scheduled for [Appointment Date] at [Appointment Time]. Thank you for choosing us.',
    array['Customer Name','Business Name','Appointment Date','Appointment Time']),
   ('appointment_reminder', 'Appointment Reminder', 'appointment_reminder',
-   'Hello [Customer Name], this is a reminder that your appointment with [Business Name] is scheduled for tomorrow at [Appointment Time]. We look forward to seeing you.',
-   array['Customer Name','Business Name','Appointment Time']),
+   'Hello [Customer Name], this is a reminder that your appointment with [Business Name] is scheduled for [Appointment Date] at [Appointment Time]. We look forward to seeing you.',
+   array['Customer Name','Business Name','Appointment Date','Appointment Time']),
   ('test_sms', 'Test SMS', 'test_sms',
    'This is a test message from SamleyBook SMS Management. SasuSync integration is working correctly.',
    array[]::text[])
 on conflict (template_key) do nothing;
+
+-- Ensure appointment reminder template includes appointment date
+update public.sms_templates
+set content = 'Hello [Customer Name], this is a reminder that your appointment with [Business Name] is scheduled for [Appointment Date] at [Appointment Time]. We look forward to seeing you.',
+    placeholders = array['Customer Name','Business Name','Appointment Date','Appointment Time']
+where template_key = 'appointment_reminder';
+
+-- Ensure booking confirmation template includes all key details
+update public.sms_templates
+set content = 'Hello [Customer Name], your appointment with [Business Name] is scheduled for [Appointment Date] at [Appointment Time]. Thank you for choosing us.',
+    placeholders = array['Customer Name','Business Name','Appointment Date','Appointment Time']
+where template_key = 'booking_confirmation';
 
 -- Audit log
 create table if not exists public.sms_audit_logs (
@@ -59,6 +71,7 @@ alter table public.sms_templates enable row level security;
 alter table public.sms_audit_logs enable row level security;
 
 -- Super admin full access
+drop policy if exists "Super admins manage sms settings" on public.sms_platform_settings;
 create policy "Super admins manage sms settings"
   on public.sms_platform_settings
   for all
@@ -66,6 +79,7 @@ create policy "Super admins manage sms settings"
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'))
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'));
 
+drop policy if exists "Super admins manage sms templates" on public.sms_templates;
 create policy "Super admins manage sms templates"
   on public.sms_templates
   for all
@@ -73,12 +87,14 @@ create policy "Super admins manage sms templates"
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'))
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'));
 
+drop policy if exists "Super admins view sms audit logs" on public.sms_audit_logs;
 create policy "Super admins view sms audit logs"
   on public.sms_audit_logs
   for select
   to authenticated
   using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'super_admin'));
 
+drop policy if exists "Super admins insert sms audit logs" on public.sms_audit_logs;
 create policy "Super admins insert sms audit logs"
   on public.sms_audit_logs
   for insert

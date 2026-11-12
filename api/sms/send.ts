@@ -348,6 +348,7 @@ export default async function handler(req: any, res: any) {
       const vars = {
         'Customer Name': appointment.customer_name,
         'Business Name': businessName,
+        'Appointment Date': appointment.appointment_date,
         'Appointment Time': appointment.appointment_time,
       };
       const message = template ? renderTemplate(template, vars) : appointmentReminderMessage({

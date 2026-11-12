@@ -104,6 +104,8 @@ export const ServicesView: React.FC = () => {
         const uploadResult = await uploadBusinessAsset(imageFile, 'services');
         if (uploadResult.url) {
           imageUrl = uploadResult.url;
+        } else if (uploadResult.error) {
+          throw new Error(`Image upload failed: ${uploadResult.error}`);
         }
       }
 

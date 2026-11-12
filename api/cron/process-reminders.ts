@@ -114,6 +114,7 @@ export default async function handler(req: any, res: any) {
       message = template.content
         .replace(/\\[Customer Name\\]/g, appointment.customer_name || '')
         .replace(/\\[Business Name\\]/g, businessName)
+        .replace(/\\[Appointment Date\\]/g, appointment.appointment_date || '')
         .replace(/\\[Appointment Time\\]/g, appointment.appointment_time || '');
     }
     if (!message) {
