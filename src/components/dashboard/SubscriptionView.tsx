@@ -9,6 +9,7 @@ export const SubscriptionView: React.FC = () => {
   const [plans, setPlans] = useState<any[]>([]);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ success: boolean; text: string } | null>(null);
+  const [paying, setPaying] = useState(false);
 
   const trialInfo = subscription?.trial_end
     ? calculateTrialRemainingDays(subscription.trial_end)
@@ -70,6 +71,43 @@ export const SubscriptionView: React.FC = () => {
     }
   };
 
+  const handlePayNow = async () => {
+    if (!currentBusiness || !subscription?.plan_id) return;
+    const plan = plans.find((p) => p.id === subscription.plan_id);
+    if (!plan) return;
+    setPaying(true);
+    setFeedback(null);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error('Supabase not configured');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const initRes = await fetch('/api/subscriptions/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ businessId: currentBusiness.id, planCode: plan.code }),
+      });
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || 'Payment initiation failed');
+
+      // Simulate Moolre approval then verify
+      const verifyRes = await fetch('/api/subscriptions/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reference: initData.reference }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) throw new Error(verifyData.error || 'Verification failed');
+
+      await refreshBusinessData();
+      setFeedback({ success: true, text: 'Subscription renewed successfully. Full access restored.' });
+    } catch (err) {
+      setFeedback({ success: false, text: err instanceof Error ? err.message : 'Payment failed.' });
+    } finally {
+      setPaying(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-left max-w-4xl">
       <div>
@@ -108,6 +146,17 @@ export const SubscriptionView: React.FC = () => {
                 : `${trialInfo.daysRemaining} Day${trialInfo.daysRemaining !== 1 ? 's' : ''} Remaining (${trialInfo.hoursRemaining} hours)`}
             </span>
           </div>
+        </div>
+
+        {/* Pay Now */}
+        <div className="pt-4 border-t border-zinc-100">
+          <button
+            onClick={handlePayNow}
+            disabled={paying}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 disabled:opacity-50 transition shadow-sm"
+          >
+            {paying ? 'Processing...' : 'Pay Now / Renew Subscription'}
+          </button>
         </div>
 
         {/* Timestamps details */}
