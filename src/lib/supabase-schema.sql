@@ -335,6 +335,19 @@ ALTER TABLE public.sms_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_closures ENABLE ROW LEVEL SECURITY;
 
+-- Helper function: business has active (or trialing) subscription
+CREATE OR REPLACE FUNCTION public.business_subscription_active(biz_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.business_subscriptions bs
+    WHERE bs.business_id = biz_id
+      AND bs.status IN ('trialing', 'active')
+      AND bs.current_period_end >= now()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Helper function to check if current user is Super Admin
 CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS BOOLEAN AS $$
@@ -401,8 +414,11 @@ DROP POLICY IF EXISTS "Owners can manage services of their businesses" ON public
 CREATE POLICY "Owners can manage services of their businesses"
     ON public.services FOR ALL
     USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = services.business_id AND b.owner_id = auth.uid()
+        (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = services.business_id AND b.owner_id = auth.uid()
+            )
+            AND public.business_subscription_active(services.business_id)
         )
         OR public.is_super_admin()
     );

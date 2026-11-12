@@ -25,8 +25,8 @@ import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { DatabaseSetupBanner } from './components/common/DatabaseSetupBanner';
 
 function AppRouter() {
-  const { user, profile, isLoading: authLoading } = useAuth();
-  const { businesses, isLoading: businessLoading } = useBusiness();
+  const { user, profile, isLoading: authLoading, signOut } = useAuth();
+  const { businesses, subscription, isLoading: businessLoading } = useBusiness();
 
   // Route state
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -142,6 +142,30 @@ function AppRouter() {
         <>
           <DatabaseSetupBanner />
           <LoginPage onNavigate={(route) => navigateTo(route)} />
+        </>
+      );
+    }
+
+    // Subscription expired: lock dashboard to renewal page only
+    if (subscription?.status === 'expired') {
+      return (
+        <>
+          <DatabaseSetupBanner />
+          <div className="min-h-screen bg-zinc-50 py-8 px-4">
+            <div className="max-w-3xl mx-auto space-y-4">
+              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
+                Your SamleyBook subscription has expired. Renew your subscription to regain access to your business dashboard and continue managing your appointments.
+              </div>
+              <SubscriptionView />
+              <button
+                onClick={() => signOut && signOut()}
+                className="px-4 py-2 rounded-xl border border-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+          <OfflineIndicator />
         </>
       );
     }
