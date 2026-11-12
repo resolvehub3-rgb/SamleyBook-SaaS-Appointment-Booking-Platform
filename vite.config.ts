@@ -20,7 +20,7 @@ export default defineConfig(() => {
           theme_color: '#ea580c',
           background_color: '#ffffff',
           display: 'standalone',
-          start_url: '/',
+          start_url: '/app/login',
           scope: '/',
           icons: [
             {

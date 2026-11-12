@@ -29,8 +29,15 @@ function AppRouter() {
   const { businesses, subscription, isLoading: businessLoading } = useBusiness();
 
   // Route state
+  const normalizePath = (p: string) => {
+    if (p === '/login') return '/app/login';
+    if (p === '/dashboard') return '/app/dashboard';
+    if (p.startsWith('/admin')) return p.replace('/admin', '/app/admin');
+    return p || '/';
+  };
+
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || '/';
+    return normalizePath(window.location.pathname || '/');
   });
 
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
@@ -39,7 +46,7 @@ function AppRouter() {
   // Sync with browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      setCurrentPath(normalizePath(window.location.pathname || '/'));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -48,7 +55,10 @@ function AppRouter() {
   const navigateTo = (pathOrSlug: string) => {
     let target = pathOrSlug.startsWith('/') ? pathOrSlug : `/${pathOrSlug}`;
     if (target === '/home') target = '/';
-
+    if (target === '/login') target = '/app/login';
+    if (target === '/dashboard') target = '/app/dashboard';
+    if (target === '/admin') target = '/app/admin';
+    if (target.startsWith('/admin/')) target = target.replace('/admin/', '/app/admin/');
     window.history.pushState({}, '', target);
     setCurrentPath(target);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -79,7 +89,7 @@ function AppRouter() {
   }
 
   // 2. AUTHENTICATION PAGES
-  if (currentPath === '/login') {
+  if (currentPath === '/app/login') {
     return (
       <>
         <DatabaseSetupBanner />
@@ -100,7 +110,7 @@ function AppRouter() {
   }
 
   // 3. SUPER ADMIN DASHBOARD: /admin
-  if (currentPath.startsWith('/admin')) {
+  if (currentPath.startsWith('/app/admin')) {
     if (authLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-white text-xs">
@@ -128,7 +138,7 @@ function AppRouter() {
   }
 
   // 4. BUSINESS OWNER DASHBOARD: /dashboard
-  if (currentPath.startsWith('/dashboard')) {
+  if (currentPath.startsWith('/app/dashboard')) {
     if (authLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-zinc-50 text-zinc-500 text-xs">
