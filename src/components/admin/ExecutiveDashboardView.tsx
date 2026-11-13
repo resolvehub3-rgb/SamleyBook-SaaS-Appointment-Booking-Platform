@@ -12,6 +12,7 @@ import {
   Activity,
   ExternalLink,
   ShieldCheck,
+  PieChart,
 } from 'lucide-react';
 import {
   AdminAppointmentRecord,
@@ -37,7 +38,6 @@ import {
   AdminLineAreaChart,
   AdminStatusDonut,
   PeriodSwitcher,
-  SubscriptionRevenueSummaryFooter,
 } from './AdminCharts';
 import {
   ADMIN_CARD,
@@ -236,6 +236,46 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
     },
   ];
 
+  const apptSeriesTotal = useMemo(
+    () => apptTrendSeries.reduce((sum, b) => sum + b.value, 0),
+    [apptTrendSeries]
+  );
+  const apptSeriesActiveTotal = useMemo(
+    () => apptTrendSeries.reduce((sum, b) => sum + (b.secondaryValue || 0), 0),
+    [apptTrendSeries]
+  );
+  const apptPeakBucket = useMemo(() => {
+    if (apptTrendSeries.length === 0) return null;
+    const peak = apptTrendSeries.reduce((best, curr) => (curr.value > best.value ? curr : best), apptTrendSeries[0]);
+    return peak.value > 0 ? peak : null;
+  }, [apptTrendSeries]);
+
+  const confirmedCount = statusBreakdown.find((s) => s.status === 'confirmed')?.count || 0;
+  const completedCount = statusBreakdown.find((s) => s.status === 'completed')?.count || 0;
+  const pendingCount = statusBreakdown.find((s) => s.status === 'pending')?.count || 0;
+  const fulfilmentRatePct =
+    appointments.length > 0
+      ? Math.round(((confirmedCount + completedCount) / appointments.length) * 100)
+      : 0;
+
+  const revenueSeriesTotal = useMemo(
+    () => revenueSeries.reduce((sum, b) => sum + b.value, 0),
+    [revenueSeries]
+  );
+  const revenueSeriesPaymentCount = useMemo(
+    () => revenueSeries.reduce((sum, b) => sum + (b.secondaryValue || 0), 0),
+    [revenueSeries]
+  );
+
+  const periodWindowLabel = (p: AdminPeriod) =>
+    p === 'daily' ? 'Last 14 days' : p === 'weekly' ? 'Last 8 weeks' : 'Last 6 months';
+
+  const formatCompactGhsAxis = (val: number) => {
+    if (val === 0) return '₵0';
+    if (val >= 1000) return `₵${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k`;
+    return `₵${val}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* 6 Executive KPI Cards */}
@@ -272,82 +312,201 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
         })}
       </section>
 
-      {/* Primary Charts Row: Appointment Trends & Status Breakdown */}
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className={`${ADMIN_CARD} p-5 xl:col-span-2 space-y-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-[#14243B]">Appointment Trends</h2>
-              <p className="text-xs text-slate-500">Booking volume scheduled across all SamleyBook businesses</p>
+      {/* Primary 3-Column Analytics Grid: Appointment Trends, Status Breakdown & Subscription Revenue */}
+      <section
+        aria-label="Platform Analytics Overview"
+        className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch"
+      >
+        {/* Column 1: Appointment Trends */}
+        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
+          <div className="flex flex-wrap items-start justify-between gap-2.5">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#E87936] flex items-center justify-center shrink-0 mt-0.5">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-[#14243B] leading-snug">Appointment Trends</h2>
+                <p className="text-[11px] text-slate-500 truncate">Scheduled bookings across platform</p>
+              </div>
             </div>
             <PeriodSwitcher value={apptPeriod} onChange={setApptPeriod} />
           </div>
-          <AdminLineAreaChart
-            data={apptTrendSeries}
-            accentColor="#E87936"
-            secondaryLabel="confirmed/completed"
-            emptyText="No appointments scheduled in this timeframe yet."
-          />
-        </div>
 
-        <div className={`${ADMIN_CARD} p-5 space-y-4`}>
-          <div>
-            <h2 className="text-sm font-bold text-[#14243B]">Appointment Status Breakdown</h2>
-            <p className="text-xs text-slate-500">Live distribution across platform bookings</p>
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="text-xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
+                {apptSeriesTotal}
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 truncate">
+                bookings · {apptSeriesActiveTotal} active/done
+              </span>
+            </div>
           </div>
-          <AdminStatusDonut items={statusBreakdown} total={appointments.length} />
-        </div>
-      </section>
 
-      {/* Secondary Charts Row: Subscription Revenue & Business Growth */}
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div className={`${ADMIN_CARD} p-5 space-y-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-[#14243B]">Subscription Revenue Analytics</h2>
-              <p className="text-xs text-slate-500">Verified SamleyBook subscription payments (GH₵)</p>
+          <div className="flex-1 flex flex-col justify-center">
+            <AdminLineAreaChart
+              data={apptTrendSeries}
+              accentColor="#E87936"
+              secondaryLabel="confirmed/completed"
+              emptyText="No appointments scheduled in this timeframe yet."
+            />
+          </div>
+
+          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>{periodWindowLabel(apptPeriod)}</span>
+            <span className="font-semibold text-[#14243B] tabular-nums truncate">
+              {apptPeakBucket ? `Peak: ${apptPeakBucket.label} (${apptPeakBucket.value})` : 'No peak yet'}
+            </span>
+          </div>
+        </div>
+
+        {/* Column 2: Appointment Status Breakdown */}
+        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                <PieChart className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-[#14243B] leading-snug">
+                  Appointment Status Breakdown
+                </h2>
+                <p className="text-[11px] text-slate-500 truncate">
+                  Live distribution across all bookings
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="text-xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
+                {fulfilmentRatePct}%
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 truncate">
+                confirmed/completed rate
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center">
+            <AdminStatusDonut items={statusBreakdown} total={appointments.length} />
+          </div>
+
+          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500 tabular-nums">
+            <span>Confirmed & done: {confirmedCount + completedCount}</span>
+            <span className="font-semibold text-[#14243B]">Pending: {pendingCount}</span>
+          </div>
+        </div>
+
+        {/* Column 3: Subscription Revenue Analytics */}
+        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
+          <div className="flex flex-wrap items-start justify-between gap-2.5">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-[#14243B] leading-snug">
+                  Subscription Revenue Analytics
+                </h2>
+                <p className="text-[11px] text-slate-500 truncate">
+                  Verified SamleyBook settlements (GH₵)
+                </p>
+              </div>
             </div>
             <PeriodSwitcher value={revPeriod} onChange={setRevPeriod} />
           </div>
-          <AdminLineAreaChart
-            data={revenueSeries}
-            accentColor="#16A34A"
-            secondaryLabel="verified payments"
-            valueFormatter={(v) => formatCurrencyGhs(v)}
-            emptyText="No verified subscription payments recorded in this timeframe yet."
-          />
-          <SubscriptionRevenueSummaryFooter
-            verifiedTotal={kpis.verifiedSubscriptionRevenue}
-            periodTotal={revenueSeries.reduce((s, b) => s + b.value, 0)}
-          />
-        </div>
 
-        <div className={`${ADMIN_CARD} p-5 space-y-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="text-xl font-extrabold text-emerald-700 tabular-nums tracking-tight">
+                {formatCurrencyGhs(revenueSeriesTotal)}
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 truncate tabular-nums">
+                in series · {formatCurrencyGhs(kpis.verifiedSubscriptionRevenue)} all-time
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center">
+            <AdminLineAreaChart
+              data={revenueSeries}
+              accentColor="#16A34A"
+              secondaryLabel="verified payments"
+              valueFormatter={(v) => formatCurrencyGhs(v)}
+              axisFormatter={formatCompactGhsAxis}
+              emptyText="No verified subscription payments recorded in this timeframe yet."
+            />
+          </div>
+
+          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>{periodWindowLabel(revPeriod)} · Verified only</span>
+            <span className="font-semibold text-[#14243B] tabular-nums">
+              {revenueSeriesPaymentCount} {revenueSeriesPaymentCount === 1 ? 'settlement' : 'settlements'}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Secondary Analytics Row: Business Growth & Category Distribution */}
+      <section className={`${ADMIN_CARD} p-5 space-y-5`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 text-[#14243B] flex items-center justify-center shrink-0">
+              <Building2 className="w-4 h-4" />
+            </div>
             <div>
               <h2 className="text-sm font-bold text-[#14243B]">Business Growth & Categories</h2>
               <p className="text-xs text-slate-500">Newly onboarded tenants and active category share</p>
             </div>
-            <PeriodSwitcher value={bizPeriod} onChange={setBizPeriod} />
           </div>
-          <AdminBarChart
-            data={bizGrowthSeries}
-            barColor="#14243B"
-            emptyText="No new business registrations recorded in this timeframe."
-          />
-          {categoryDist.length > 0 && (
-            <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2">
-              {categoryDist.slice(0, 6).map((cat) => (
-                <span
-                  key={cat.category}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F5F6F8] border border-slate-200/80 text-[11px] font-semibold text-[#14243B] tabular-nums"
-                >
-                  <span>{cat.category}</span>
-                  <span className="text-slate-500">{cat.count} ({cat.percentage}%)</span>
-                </span>
-              ))}
+          <PeriodSwitcher value={bizPeriod} onChange={setBizPeriod} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-7">
+            <AdminBarChart
+              data={bizGrowthSeries}
+              barColor="#14243B"
+              emptyText="No new business registrations recorded in this timeframe."
+            />
+          </div>
+
+          <div className="lg:col-span-5 lg:border-l lg:border-slate-100 lg:pl-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Category Share
+              </h3>
+              <span className="text-[11px] font-semibold text-slate-500 tabular-nums">
+                {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'}
+              </span>
             </div>
-          )}
+            {categoryDist.length === 0 ? (
+              <div className="py-10 text-center rounded-xl bg-[#F5F6F8]/70 border border-dashed border-slate-200 text-xs text-slate-500">
+                No registered business categories yet.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {categoryDist.slice(0, 6).map((cat) => (
+                  <div key={cat.category} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="font-semibold text-[#14243B] truncate">{cat.category}</span>
+                      <span className="font-bold text-[#14243B] tabular-nums shrink-0">
+                        {cat.count} <span className="text-slate-400 font-medium">({cat.percentage}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[#14243B]"
+                        style={{ width: `${cat.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
