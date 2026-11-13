@@ -224,3 +224,50 @@ export function resolvePremiumPlan<
   const byName = plans.find((p) => (p.name || '').toLowerCase().includes('premium'));
   return byName || plans[0];
 }
+
+/**
+ * Resolves a customer's phone number for feedback follow-up from linked appointment/customer records.
+ */
+export function resolveFeedbackPhone(
+  feedbackItem: {
+    appointment_id?: string | null;
+    customer_id?: string | null;
+    appointment?: { customer_phone?: string | null } | null;
+    customer?: { phone?: string | null } | null;
+  },
+  fallbackAppointments: Array<{ id: string; customer_phone?: string | null }> = [],
+  fallbackCustomers: Array<{ id: string; phone?: string | null }> = []
+): string | null {
+  const fromJoinedAppt = feedbackItem.appointment?.customer_phone?.trim();
+  if (fromJoinedAppt) return fromJoinedAppt;
+
+  const fromJoinedCustomer = feedbackItem.customer?.phone?.trim();
+  if (fromJoinedCustomer) return fromJoinedCustomer;
+
+  if (feedbackItem.appointment_id) {
+    const matchedAppt = fallbackAppointments.find((a) => a.id === feedbackItem.appointment_id);
+    const fromFallbackAppt = matchedAppt?.customer_phone?.trim();
+    if (fromFallbackAppt) return fromFallbackAppt;
+  }
+
+  if (feedbackItem.customer_id) {
+    const matchedCustomer = fallbackCustomers.find((c) => c.id === feedbackItem.customer_id);
+    const fromFallbackCustomer = matchedCustomer?.phone?.trim();
+    if (fromFallbackCustomer) return fromFallbackCustomer;
+  }
+
+  return null;
+}
+
+/**
+ * Formats a phone number into a safe native device `tel:` URI (preserving leading `+` and digits).
+ */
+export function formatTelHref(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const trimmed = phone.trim();
+  const hasLeadingPlus = trimmed.startsWith('+');
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return null;
+  return `tel:${hasLeadingPlus ? '+' : ''}${digits}`;
+}
+

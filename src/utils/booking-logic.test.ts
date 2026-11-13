@@ -10,6 +10,8 @@ import {
   generateBusinessSlug,
   canRegisterAdditionalBusiness,
   resolvePremiumPlan,
+  resolveFeedbackPhone,
+  formatTelHref,
   OperatingHoursMap,
 } from './booking-logic';
 
@@ -152,3 +154,45 @@ test('resolvePremiumPlan: resolves Book Premium or legacy starter plan from data
   );
   assert.equal(resolvePremiumPlan([], null), null);
 });
+
+test('resolveFeedbackPhone: resolves customer phone from joined appointment, joined customer, or fallbacks', () => {
+  assert.equal(
+    resolveFeedbackPhone({
+      appointment_id: 'a1',
+      appointment: { customer_phone: ' 0244123456 ' },
+    }),
+    '0244123456'
+  );
+  assert.equal(
+    resolveFeedbackPhone({
+      appointment_id: 'a2',
+      customer: { phone: '+233 50 111 2233' },
+    }),
+    '+233 50 111 2233'
+  );
+  assert.equal(
+    resolveFeedbackPhone(
+      { appointment_id: 'a3', customer_id: 'c3' },
+      [{ id: 'a3', customer_phone: '0559876543' }],
+      [{ id: 'c3', phone: '0200000000' }]
+    ),
+    '0559876543'
+  );
+  assert.equal(
+    resolveFeedbackPhone(
+      { appointment_id: 'a-missing', customer_id: 'c4' },
+      [],
+      [{ id: 'c4', phone: '0277654321' }]
+    ),
+    '0277654321'
+  );
+  assert.equal(resolveFeedbackPhone({ appointment_id: 'none' }, [], []), null);
+});
+
+test('formatTelHref: builds clean tel: URIs for local and international numbers', () => {
+  assert.equal(formatTelHref('024 412 3456'), 'tel:0244123456');
+  assert.equal(formatTelHref('+233 (0) 59-434-5424'), 'tel:+2330594345424');
+  assert.equal(formatTelHref('   '), null);
+  assert.equal(formatTelHref(null), null);
+});
+
