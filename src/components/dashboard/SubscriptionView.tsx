@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { getSupabase } from '../../lib/supabase';
-import { calculateTrialRemainingDays, formatGHS } from '../../utils/booking-logic';
+import {
+  calculateTrialRemainingDays,
+  formatGHS,
+  resolvePremiumPlan,
+} from '../../utils/booking-logic';
 import { PRIMARY_ORANGE_BTN, SURFACE_CARD } from './ui/DashboardTokens';
 
 interface SubscriptionPaymentRecord {
@@ -23,10 +27,21 @@ interface SubscriptionPaymentRecord {
   created_at: string;
 }
 
+const BOOK_PREMIUM_FEATURES = [
+  'Online appointment booking',
+  'Business dashboard',
+  'Service management',
+  'Customer management',
+  'Appointment management',
+  'Business booking page and QR code',
+  'Customer feedback management',
+  '7-day free trial',
+];
+
 export const SubscriptionView: React.FC = () => {
   const { currentBusiness, subscription, refreshBusinessData } = useBusiness();
   const [plans, setPlans] = useState<any[]>([]);
-  const [selecting, setSelecting] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ success: boolean; text: string } | null>(null);
   const [paying, setPaying] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState<SubscriptionPaymentRecord[]>([]);
@@ -42,10 +57,11 @@ export const SubscriptionView: React.FC = () => {
       const { data } = await supabase
         .from('subscription_plans')
         .select('*')
+        .eq('is_active', true)
         .order('price_ghs', { ascending: true });
-      // Single plan model: only SamleyBook Monthly Subscription (GH₵120)
-      const single = (data || []).filter((p: any) => (p.code || '').toLowerCase() === 'starter');
-      setPlans(single.length ? single : (data || []).slice(0, 1));
+
+      const resolved = resolvePremiumPlan(data || [], subscription?.plan_id);
+      setPlans(resolved ? [resolved] : (data || []).slice(0, 1));
 
       if (currentBusiness?.id) {
         const { data: txData } = await supabase
@@ -59,20 +75,17 @@ export const SubscriptionView: React.FC = () => {
       }
     };
     fetchPlansAndHistory();
-  }, [currentBusiness?.id, subscription?.updated_at]);
+  }, [currentBusiness?.id, subscription?.plan_id, subscription?.updated_at]);
 
-  const getDbPlan = (name: string) =>
-    plans.find(
-      (p) =>
-        (p.name || '').toLowerCase() === name.toLowerCase() ||
-        (p.code || '').toLowerCase() === name.toLowerCase().replace(' plan', '').trim()
-    );
+  const activeDbPlan = resolvePremiumPlan(plans, subscription?.plan_id);
 
-  const handleSelectPlan = async (planName: string) => {
+  const handleSelectPlan = async () => {
     if (!currentBusiness) return;
-    const dbPlan = getDbPlan(planName);
-    if (!dbPlan) {
-      setFeedback({ success: false, text: `Plan "${planName}" is not available in the database yet.` });
+    if (!activeDbPlan) {
+      setFeedback({
+        success: false,
+        text: 'Book Premium plan is not available in the database yet.',
+      });
       return;
     }
     const supabase = getSupabase();
@@ -81,14 +94,14 @@ export const SubscriptionView: React.FC = () => {
       return;
     }
 
-    setSelecting(planName);
+    setSelecting(true);
     setFeedback(null);
     try {
       if (subscription?.id) {
         const { error } = await supabase
           .from('business_subscriptions')
           .update({
-            plan_id: dbPlan.id,
+            plan_id: activeDbPlan.id,
             updated_at: new Date().toISOString(),
           })
           .eq('id', subscription.id);
@@ -96,25 +109,30 @@ export const SubscriptionView: React.FC = () => {
       } else {
         const { error } = await supabase.from('business_subscriptions').insert({
           business_id: currentBusiness.id,
-          plan_id: dbPlan.id,
+          plan_id: activeDbPlan.id,
           status: 'trialing',
           payment_status: 'none',
         });
         if (error) throw error;
       }
       await refreshBusinessData();
-      setFeedback({ success: true, text: `${planName} selected successfully. Your subscription has been updated.` });
+      setFeedback({
+        success: true,
+        text: 'Book Premium selected successfully. Your subscription has been updated.',
+      });
     } catch (err) {
-      setFeedback({ success: false, text: err instanceof Error ? err.message : 'Failed to select plan.' });
+      setFeedback({
+        success: false,
+        text: err instanceof Error ? err.message : 'Failed to select plan.',
+      });
     } finally {
-      setSelecting(null);
+      setSelecting(false);
     }
   };
 
   const handlePayNow = async () => {
-    if (!currentBusiness || !subscription?.plan_id) return;
-    const plan = plans.find((p) => p.id === subscription.plan_id);
-    if (!plan) return;
+    if (!currentBusiness) return;
+    const planCode = activeDbPlan?.code || 'premium';
     setPaying(true);
     setFeedback(null);
     try {
@@ -124,10 +142,12 @@ export const SubscriptionView: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) throw new Error('Please sign in again to complete payment.');
+
       const initRes = await fetch('/api/subscriptions/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ businessId: currentBusiness.id, planCode: plan.code }),
+        body: JSON.stringify({ businessId: currentBusiness.id, planCode }),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || 'Payment initiation failed');
@@ -142,9 +162,15 @@ export const SubscriptionView: React.FC = () => {
       if (!verifyRes.ok) throw new Error(verifyData.error || 'Verification failed');
 
       await refreshBusinessData();
-      setFeedback({ success: true, text: 'Subscription renewed successfully. Full access restored.' });
+      setFeedback({
+        success: true,
+        text: 'Book Premium subscription verified and active. Multi-business registration unlocked.',
+      });
     } catch (err) {
-      setFeedback({ success: false, text: err instanceof Error ? err.message : 'Payment failed.' });
+      setFeedback({
+        success: false,
+        text: err instanceof Error ? err.message : 'Payment failed.',
+      });
     } finally {
       setPaying(false);
     }
@@ -154,8 +180,15 @@ export const SubscriptionView: React.FC = () => {
     subscription?.status === 'trialing'
       ? '7-Day Free Trial Active'
       : subscription?.status === 'active'
-      ? `${subscription?.plan?.name || 'Active Plan'} Active`
+      ? 'Book Premium Active'
       : subscription?.status || 'Active Trial';
+
+  const isPlanAssigned = Boolean(
+    subscription?.plan_id && activeDbPlan?.id && subscription.plan_id === activeDbPlan.id
+  );
+  const isPaidActive =
+    subscription?.status === 'active' && subscription?.payment_status === 'paid';
+  const displayPriceNum = activeDbPlan ? Number(activeDbPlan.price_ghs || 120) : 120;
 
   return (
     <div className="space-y-6 text-left">
@@ -229,7 +262,7 @@ export const SubscriptionView: React.FC = () => {
                 Assigned Plan
               </p>
               <p className="font-extrabold text-[#111827] text-sm mt-1">
-                {subscription?.plan?.name || 'Growth Plan (Trial Access)'}
+                {isPaidActive ? 'Book Premium (Active)' : 'Book Premium (7-Day Trial)'}
               </p>
             </div>
           </div>
@@ -245,10 +278,14 @@ export const SubscriptionView: React.FC = () => {
             <button
               type="button"
               onClick={handlePayNow}
-              disabled={paying || !subscription?.plan_id}
+              disabled={paying}
               className={`${PRIMARY_ORANGE_BTN} px-6 py-2.5 text-xs shrink-0`}
             >
-              <CreditCard className="w-4 h-4" />
+              {paying ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CreditCard className="w-4 h-4" />
+              )}
               <span>{paying ? 'Processing...' : 'Pay Now / Renew Subscription'}</span>
             </button>
           </div>
@@ -272,99 +309,98 @@ export const SubscriptionView: React.FC = () => {
         </div>
       )}
 
-      {/* Available Plans for Upgrade */}
+      {/* Single Book Premium Plan */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-[#111827]">Standard Subscription Packages</h3>
-            <p className="text-xs text-slate-500">
-              Select a package and complete renewal anytime
-            </p>
-          </div>
+        <div>
+          <h3 className="text-base font-extrabold text-[#111827]">Subscription Plan</h3>
+          <p className="text-xs text-slate-500">
+            One complete appointment management platform for your business.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {[
-            {
-              name: 'Starter Plan',
-              price: 'GHS 120.00 / month',
-              features: ['Up to 200 bookings/month', 'QR Code Booking Page', 'Moolre Payments', 'SMS Confirmations'],
-            },
-            {
-              name: 'Growth Plan',
-              price: 'GHS 250.00 / month',
-              popular: true,
-              features: ['Unlimited appointments', '24h SMS Reminders', 'PWA Mobile App', 'Customer Records'],
-            },
-            {
-              name: 'Pro Plan',
-              price: 'GHS 450.00 / month',
-              features: ['Multi-business Switcher', 'Priority SMS gateway', 'Dedicated Support', 'Advanced Analytics'],
-            },
-          ].map((plan, idx) => {
-            const isSelected = subscription?.plan?.name === plan.name;
-            const dbPlan = getDbPlan(plan.name);
-            const features =
-              Array.isArray(dbPlan?.features) && dbPlan.features.length ? dbPlan.features : plan.features;
-            const displayPrice = dbPlan
-              ? `GHS ${Number(dbPlan.price_ghs).toFixed(2)} / ${dbPlan.billing_cycle === 'yearly' ? 'year' : 'month'}`
-              : plan.price;
-
-            return (
-              <div
-                key={idx}
-                className={`${SURFACE_CARD} p-6 flex flex-col justify-between transition ${
-                  plan.popular ? 'border-[#F95700] ring-2 ring-[#F95700]/15' : ''
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-base font-extrabold text-[#111827]">{plan.name}</h4>
-                    {plan.popular && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#FFF3EC] text-[#F95700] text-[10px] font-bold">
-                        Popular
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-lg font-black text-[#F95700]">{displayPrice}</p>
-                  <div className="space-y-2 pt-3 border-t border-slate-100">
-                    {features.map((f: string, fIdx: number) => (
-                      <div key={fIdx} className="flex items-center gap-2 text-xs text-slate-600">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
-                        <span>{f}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <button
-                    type="button"
-                    disabled={selecting === plan.name}
-                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition ${
-                      isSelected
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : plan.popular
-                        ? PRIMARY_ORANGE_BTN
-                        : 'border border-slate-200 text-[#111827] hover:bg-slate-50'
-                    } disabled:opacity-60`}
-                    onClick={() => handleSelectPlan(plan.name)}
-                  >
-                    {selecting === plan.name ? (
-                      <span className="inline-flex items-center justify-center gap-2">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Selecting...
-                      </span>
-                    ) : isSelected ? (
-                      'Selected Plan'
-                    ) : (
-                      'Select Plan'
-                    )}
-                  </button>
-                </div>
+        <div className="max-w-2xl">
+          <div className="relative rounded-3xl p-6 sm:p-7 bg-white border-2 border-[#F95700] shadow-[0_8px_28px_rgba(249,87,0,0.12)] ring-4 ring-orange-100/70 space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="inline-flex px-3 py-1 rounded-full bg-[#FFF3EC] text-[#F95700] text-[10.5px] font-extrabold uppercase tracking-wider">
+                  Book Premium
+                </span>
+                <h4 className="text-xl font-black text-[#111827] mt-2">Book Premium</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  One complete appointment management platform for your business.
+                </p>
               </div>
-            );
-          })}
+              {isPaidActive && (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold shrink-0">
+                  Active
+                </span>
+              )}
+            </div>
+
+            <div className="pb-4 border-b border-slate-100">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-black text-[#111827] tabular-nums">
+                  GHS {displayPriceNum.toFixed(2)}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">/month</span>
+              </div>
+              <p className="text-[11px] font-bold text-[#F95700] mt-1">
+                &bull; 7-Day Free Trial Active on Sign-up
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              <p className="text-xs font-extrabold text-[#111827] uppercase tracking-wider">
+                Included Features:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {BOOK_PREMIUM_FEATURES.map((feature, fIdx) => (
+                  <div key={fIdx} className="flex items-center gap-2 text-xs text-slate-700">
+                    <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+              <button
+                type="button"
+                onClick={handlePayNow}
+                disabled={paying}
+                className={`${PRIMARY_ORANGE_BTN} flex-1 py-2.5 px-4 text-xs`}
+              >
+                {paying ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CreditCard className="w-3.5 h-3.5" />
+                )}
+                <span>{paying ? 'Processing Payment...' : 'Pay Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={selecting || isPlanAssigned}
+                onClick={handleSelectPlan}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition ${
+                  isPlanAssigned
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                    : 'border border-slate-200 text-[#111827] hover:bg-slate-50'
+                } disabled:opacity-75`}
+              >
+                {selecting ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Selecting...
+                  </span>
+                ) : isPlanAssigned ? (
+                  'Selected Plan'
+                ) : (
+                  'Select Plan'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

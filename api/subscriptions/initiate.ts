@@ -53,11 +53,24 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const { data: plan } = await supabase
+  let { data: plan } = await supabase
     .from('subscription_plans')
     .select('id, price_ghs, billing_cycle')
     .eq('code', planCode)
-    .single();
+    .maybeSingle();
+
+  if (!plan) {
+    const { data: fallbackPlan } = await supabase
+      .from('subscription_plans')
+      .select('id, price_ghs, billing_cycle')
+      .in('code', ['premium', 'book-premium', 'starter'])
+      .eq('is_active', true)
+      .order('price_ghs', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    plan = fallbackPlan;
+  }
+
   if (!plan) {
     res.status(404).json({ error: 'Plan not found' });
     return;

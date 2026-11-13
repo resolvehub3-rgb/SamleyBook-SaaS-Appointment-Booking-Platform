@@ -8,6 +8,8 @@ import {
   calculateTrialRemainingDays,
   isValidGhanaPhone,
   generateBusinessSlug,
+  canRegisterAdditionalBusiness,
+  resolvePremiumPlan,
   OperatingHoursMap,
 } from './booking-logic';
 
@@ -115,4 +117,38 @@ test('isValidGhanaPhone: checks phone formats', () => {
 test('generateBusinessSlug: creates clean URL slugs', () => {
   assert.equal(generateBusinessSlug('Royal Cuts & Grooming Bar'), 'royal-cuts-grooming-bar');
   assert.equal(generateBusinessSlug('Serene Spa  Lounge!'), 'serene-spa-lounge');
+});
+
+test('canRegisterAdditionalBusiness: enforces paid active upgrade after first business', () => {
+  assert.equal(canRegisterAdditionalBusiness(0, null), true);
+  assert.equal(
+    canRegisterAdditionalBusiness(1, { status: 'trialing', payment_status: 'none' }),
+    false
+  );
+  assert.equal(
+    canRegisterAdditionalBusiness(1, { status: 'active', payment_status: 'pending' }),
+    false
+  );
+  assert.equal(
+    canRegisterAdditionalBusiness(1, { status: 'expired', payment_status: 'paid' }),
+    false
+  );
+  assert.equal(
+    canRegisterAdditionalBusiness(1, { status: 'active', payment_status: 'paid' }),
+    true
+  );
+});
+
+test('resolvePremiumPlan: resolves Book Premium or legacy starter plan from database list', () => {
+  const plans = [
+    { id: 'p-starter', code: 'starter', name: 'Starter Plan' },
+    { id: 'p-premium', code: 'premium', name: 'Book Premium' },
+  ];
+  assert.equal(resolvePremiumPlan(plans, 'p-starter')?.id, 'p-starter');
+  assert.equal(resolvePremiumPlan(plans, null)?.id, 'p-premium');
+  assert.equal(
+    resolvePremiumPlan([{ id: 'p-only', code: 'starter', name: 'Starter Plan' }], null)?.id,
+    'p-only'
+  );
+  assert.equal(resolvePremiumPlan([], null), null);
 });

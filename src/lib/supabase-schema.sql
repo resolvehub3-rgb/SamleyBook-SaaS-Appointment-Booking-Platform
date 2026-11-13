@@ -152,12 +152,10 @@ CREATE TABLE IF NOT EXISTS public.subscription_plans (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Insert standard SamleyBook plans if not exists
+-- Insert standard SamleyBook plan if not exists
 INSERT INTO public.subscription_plans (name, code, description, price_ghs, billing_cycle, features, is_active)
 VALUES
-    ('Starter Plan', 'starter', 'Perfect for independent stylists, solo barbers, and boutique studios', 120.00, 'monthly', '["Up to 200 appointments/month", "Custom QR code booking page", "Moolre Mobile Money integration", "SMS booking confirmation", "24h SMS appointment reminders", "7-Day Free Trial included"]'::jsonb, true),
-    ('Growth Plan', 'growth', 'Ideal for busy salons, spas, and expanding wellness centres', 250.00, 'monthly', '["Unlimited appointments", "Custom QR code & branding", "Moolre Mobile Money integration", "Priority SMS notifications", "Automated 24h reminders", "Customer history & notes", "PWA mobile install support"]'::jsonb, true),
-    ('Pro Plan', 'pro', 'For high-volume studios and premier multi-location appointment hubs', 450.00, 'monthly', '["All Growth features", "Multi-business support", "Highest throughput SMS gateway", "Deposit & full advance payments", "Dedicated SamTeck Digital support", "Real-time revenue analytics"]'::jsonb, true)
+    ('Book Premium', 'premium', 'One complete appointment management platform for your business.', 120.00, 'monthly', '["Online appointment booking", "Business dashboard", "Service management", "Customer management", "Appointment management", "Business booking page and QR code", "Customer feedback management", "7-day free trial"]'::jsonb, true)
 ON CONFLICT (code) DO NOTHING;
 
 -- 7. BUSINESS SUBSCRIPTIONS (7-Day Trial Tracking)

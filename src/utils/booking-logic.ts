@@ -191,3 +191,36 @@ export function generateBusinessSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
+
+/**
+ * Business owners can register their first business on sign-up/trial,
+ * but registering additional business locations or brands requires
+ * a verified active paid subscription.
+ */
+export function canRegisterAdditionalBusiness(
+  existingBusinessCount: number,
+  subscription?: { status?: string | null; payment_status?: string | null } | null
+): boolean {
+  if (existingBusinessCount <= 0) return true;
+  return subscription?.status === 'active' && subscription?.payment_status === 'paid';
+}
+
+/**
+ * Resolves the single Book Premium plan from Supabase subscription_plans rows,
+ * supporting both 'premium' and legacy 'starter' codes cleanly.
+ */
+export function resolvePremiumPlan<
+  T extends { id?: string; code?: string | null; name?: string | null }
+>(plans: T[], assignedPlanId?: string | null): T | null {
+  if (!plans || plans.length === 0) return null;
+  if (assignedPlanId) {
+    const byId = plans.find((p) => p.id === assignedPlanId);
+    if (byId) return byId;
+  }
+  for (const preferredCode of ['premium', 'book-premium', 'starter']) {
+    const byCode = plans.find((p) => (p.code || '').toLowerCase() === preferredCode);
+    if (byCode) return byCode;
+  }
+  const byName = plans.find((p) => (p.name || '').toLowerCase().includes('premium'));
+  return byName || plans[0];
+}
