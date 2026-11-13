@@ -17,12 +17,15 @@ import { useBusiness } from '../../context/BusinessContext';
 import { getSupabase, uploadBusinessAsset } from '../../lib/supabase';
 import { formatGHS, formatDurationMinutes } from '../../utils/booking-logic';
 import { Service } from '../../types/database';
+import { PRIMARY_ORANGE_BTN, SURFACE_CARD } from './ui/DashboardTokens';
 
 export const ServicesView: React.FC = () => {
   const { currentBusiness, services, refreshBusinessData } = useBusiness();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -99,7 +102,6 @@ export const ServicesView: React.FC = () => {
 
       let imageUrl = editingService?.image_url || null;
 
-      // Upload image if selected
       if (imageFile) {
         const uploadResult = await uploadBusinessAsset(imageFile, 'services');
         if (uploadResult.url) {
@@ -110,7 +112,6 @@ export const ServicesView: React.FC = () => {
       }
 
       if (editingService) {
-        // Update existing service
         const { error } = await supabase
           .from('services')
           .update({
@@ -125,7 +126,6 @@ export const ServicesView: React.FC = () => {
 
         if (error) throw error;
       } else {
-        // Create new service
         const { error } = await supabase.from('services').insert({
           business_id: currentBusiness.id,
           name: name.trim(),
@@ -149,91 +149,110 @@ export const ServicesView: React.FC = () => {
   };
 
   const handleToggleActive = async (service: Service) => {
+    setActionError(null);
     try {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      await supabase
+      const { error } = await supabase
         .from('services')
         .update({ is_active: !service.is_active })
         .eq('id', service.id);
 
+      if (error) throw error;
       await refreshBusinessData();
     } catch (err) {
-      console.error('Failed to toggle status:', err);
+      setActionError(err instanceof Error ? err.message : 'Failed to toggle service status');
     }
   };
 
   const handleDelete = async (serviceId: string) => {
-    if (!confirm('Are you sure you want to delete this service?')) return;
-
+    setActionError(null);
     try {
       const supabase = getSupabase();
       if (!supabase) return;
 
       const { error } = await supabase.from('services').delete().eq('id', serviceId);
       if (error) {
-        alert(`Cannot delete service: ${error.message}`);
+        setActionError(`Cannot delete service: ${error.message}`);
       } else {
+        setConfirmDeleteId(null);
         await refreshBusinessData();
       }
     } catch (err) {
-      console.error('Error deleting service:', err);
+      setActionError(err instanceof Error ? err.message : 'Error deleting service');
     }
   };
 
+  const activeCount = services.filter((s) => s.is_active).length;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 text-left">
+      {/* Summary & Action Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black text-zinc-900 tracking-tight">Services & Pricing</h2>
-          <p className="text-xs text-zinc-500">
-            Create, edit, and price the services offered on your public booking page
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 rounded-2xl bg-gradient-to-br from-[#FFF6EE] to-[#FFE7D4] border border-[#FADAC1] text-xs font-bold text-[#111827]">
+            Total Services: <span className="font-black text-[#F95700] ml-1">{services.length}</span>
+          </div>
+          <div className="px-4 py-2 rounded-2xl bg-gradient-to-br from-[#ECFDF5] to-[#CEFAE0] border border-[#A7F3D0] text-xs font-bold text-[#111827]">
+            Active on Booking Page: <span className="font-black text-emerald-700 ml-1">{activeCount}</span>
+          </div>
         </div>
 
         <button
+          type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 shadow-xs transition"
+          className={`${PRIMARY_ORANGE_BTN} px-4 py-2.5 text-xs`}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Add New Service</span>
         </button>
       </div>
 
+      {actionError && (
+        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{actionError}</span>
+          </div>
+          <button type="button" onClick={() => setActionError(null)} className="text-rose-500 hover:text-rose-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Services List / Grid */}
       {services.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-3xl border border-zinc-200/80 shadow-xs space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto">
+        <div className={`${SURFACE_CARD} p-12 text-center space-y-4`}>
+          <div className="w-12 h-12 rounded-2xl bg-[#FFF3EC] text-[#F95700] flex items-center justify-center mx-auto">
             <Scissors className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-zinc-900">No Services Added Yet</h3>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-1">
+            <h3 className="text-base font-extrabold text-[#111827]">No Services Added Yet</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
               Add your first haircut, styling, massage, consultation, or package to start accepting online bookings.
             </p>
           </div>
           <button
+            type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 transition"
+            className={`${PRIMARY_ORANGE_BTN} px-5 py-2.5 text-xs`}
           >
             <Plus className="w-4 h-4" />
             <span>Create First Service</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {services.map((svc) => (
             <div
               key={svc.id}
-              className={`rounded-3xl bg-white border transition-all overflow-hidden flex flex-col justify-between shadow-xs ${
-                svc.is_active ? 'border-zinc-200/80 hover:border-orange-200' : 'border-zinc-200 opacity-60'
+              className={`${SURFACE_CARD} overflow-hidden flex flex-col justify-between transition-all ${
+                svc.is_active ? 'hover:border-orange-200 hover:shadow-md' : 'opacity-65'
               }`}
             >
               <div>
-                {/* Service Image banner or placeholder */}
-                <div className="h-40 bg-zinc-100 relative overflow-hidden">
+                <div className="h-40 bg-slate-100 relative overflow-hidden">
                   {svc.image_url ? (
                     <img
                       src={svc.image_url}
@@ -241,17 +260,17 @@ export const ServicesView: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#FFF6EE] to-[#FFE7D4] text-[#F95700]/40">
                       <Scissors className="w-10 h-10" />
                     </div>
                   )}
 
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <div className="absolute top-3 right-3">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-xs ${
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs ${
                         svc.is_active
                           ? 'bg-emerald-500 text-white'
-                          : 'bg-zinc-700 text-white'
+                          : 'bg-slate-700 text-white'
                       }`}
                     >
                       {svc.is_active ? 'Active on Page' : 'Inactive'}
@@ -259,62 +278,87 @@ export const ServicesView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="p-5 space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-base font-bold text-zinc-900 leading-snug">{svc.name}</h3>
-                    <span className="text-base font-black text-orange-600 shrink-0">
+                    <h3 className="text-base font-extrabold text-[#111827] leading-snug">{svc.name}</h3>
+                    <span className="text-base font-black text-[#F95700] shrink-0">
                       {formatGHS(svc.price)}
                     </span>
                   </div>
 
-                  <p className="text-xs text-zinc-500 line-clamp-2 min-h-[32px]">
+                  <p className="text-xs text-slate-500 line-clamp-2 min-h-[32px]">
                     {svc.description || 'No description provided.'}
                   </p>
 
-                  <div className="flex items-center gap-2 text-xs font-semibold text-zinc-600 pt-2 border-t border-zinc-100">
-                    <Clock className="w-3.5 h-3.5 text-orange-600" />
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 pt-2 border-t border-slate-100">
+                    <Clock className="w-3.5 h-3.5 text-[#F95700]" />
                     <span>{formatDurationMinutes(svc.duration_minutes)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="p-4 bg-zinc-50/70 border-t border-zinc-100 flex items-center justify-between">
-                <button
-                  onClick={() => handleToggleActive(svc)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900"
-                  title={svc.is_active ? 'Deactivate service' : 'Reactivate service'}
-                >
-                  {svc.is_active ? (
-                    <>
-                      <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Deactivate</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Activate</span>
-                    </>
-                  )}
-                </button>
+              <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                {confirmDeleteId === svc.id ? (
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-[11px] font-bold text-rose-700">Delete service?</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(svc.id)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold hover:bg-rose-700"
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(svc)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-[#111827]"
+                    >
+                      {svc.is_active ? (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Deactivate</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Activate</span>
+                        </>
+                      )}
+                    </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openEditModal(svc)}
-                    className="p-1.5 rounded-lg text-zinc-500 hover:text-orange-600 hover:bg-orange-50 transition"
-                    title="Edit Service"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(svc.id)}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition"
-                    title="Delete Service"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(svc)}
+                        aria-label={`Edit ${svc.name}`}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#F95700] hover:bg-orange-50 transition"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(svc.id)}
+                        aria-label={`Delete ${svc.name}`}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -323,157 +367,159 @@ export const ServicesView: React.FC = () => {
 
       {/* CREATE / EDIT MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-zinc-100 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
-              <h3 className="text-lg font-bold text-zinc-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
+            <div className="bg-gradient-to-r from-[#FF6514] to-[#E64D00] px-6 py-4 flex items-center justify-between text-white">
+              <h3 className="text-base font-extrabold">
                 {editingService ? 'Edit Service' : 'Add New Service'}
               </h3>
               <button
+                type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700"
+                aria-label="Close modal"
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/15"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {errorMsg && (
-              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+            <div className="p-6">
+              {errorMsg && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Service Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Traditional Beard Sculpting"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Describe what is included in this service..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-4 text-left">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                    Price (GHS)
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Service Name
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
                     required
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="e.g. Traditional Beard Sculpting"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                    Duration (Minutes)
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Description
                   </label>
-                  <input
-                    type="number"
-                    min="5"
-                    step="5"
-                    required
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  <textarea
+                    rows={2}
+                    placeholder="Describe what is included in this service..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
                   />
-                  <p className="mt-1 text-[11px] font-semibold text-orange-600">
-                    {formatDurationMinutes(duration)}
-                  </p>
                 </div>
-              </div>
 
-              {/* Service Image Upload */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Service Image (Optional)
-                </label>
-                <div className="flex items-center gap-3">
-                  {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-14 h-14 rounded-xl object-cover border border-zinc-200"
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Price (GHS)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
                     />
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl bg-zinc-100 border border-dashed border-zinc-300 flex items-center justify-center text-zinc-400">
-                      <Upload className="w-5 h-5" />
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer"
-                  />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Duration (Minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      step="5"
+                      required
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                    />
+                    <p className="mt-1 text-[11px] font-bold text-[#F95700]">
+                      {formatDurationMinutes(duration)}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Status Toggle */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="rounded text-orange-600 focus:ring-orange-500"
-                />
-                <label htmlFor="isActive" className="text-xs font-semibold text-zinc-700">
-                  Make service visible on public booking page
-                </label>
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Service Image (Optional)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {imagePreview ? (
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#FFF3EC] file:text-[#F95700] hover:file:bg-orange-100 cursor-pointer"
+                    />
+                  </div>
+                </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-zinc-200 text-zinc-600 font-semibold text-xs hover:bg-zinc-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-orange-700 disabled:opacity-50 transition"
-                >
-                  {submitting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving Service...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{editingService ? 'Update Service' : 'Save Service'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="rounded text-[#F95700] focus:ring-[#F95700]"
+                  />
+                  <label htmlFor="isActive" className="text-xs font-bold text-slate-700">
+                    Make service visible on public booking page
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`${PRIMARY_ORANGE_BTN} px-5 py-2.5 text-xs`}
+                  >
+                    {submitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>{editingService ? 'Update Service' : 'Save Service'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
