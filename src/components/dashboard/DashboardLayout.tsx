@@ -199,8 +199,8 @@ export const DashboardLayout: React.FC<Props> = ({
   };
 
   const primaryTopNav = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'overview', label: 'Overview', icon: BarChart2 },
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'services', label: 'Services', icon: Scissors },
   ] as const;
 

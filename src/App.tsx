@@ -41,8 +41,18 @@ function AppRouter() {
     return normalizePath(window.location.pathname || '/');
   });
 
-  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('dashboard');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
   const [createBusinessModalOpen, setCreateBusinessModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setDashboardTab('overview');
+    } else if (!authLoading && currentPath === '/app/login') {
+      const dest = profile?.role === 'super_admin' ? '/app/admin' : '/app/dashboard';
+      window.history.replaceState({}, '', dest);
+      setCurrentPath(dest);
+    }
+  }, [user, authLoading, currentPath, profile?.role]);
 
   // Sync with browser back/forward buttons
   useEffect(() => {
@@ -209,7 +219,7 @@ function AppRouter() {
         case 'settings':
           return <SettingsView />;
         default:
-          return <DashboardView onSelectTab={setDashboardTab} />;
+          return <OverviewView onSelectTab={setDashboardTab} />;
       }
     };
 

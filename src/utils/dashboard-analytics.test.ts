@@ -9,6 +9,7 @@ import {
   formatTime12h,
   computeCalendarEventLayout,
   assignDayEventColumns,
+  getMonthCalendarGrid,
 } from './dashboard-analytics';
 import { Appointment, Service } from '../types/database';
 
@@ -153,4 +154,22 @@ test('computeCalendarEventLayout & assignDayEventColumns: splits overlapping sam
   assert.equal(positioned[1].widthPct, 50);
   assert.equal(positioned[1].leftPct, 50);
   assert.equal(positioned[2].widthPct, 100);
+});
+
+test('getMonthCalendarGrid: builds complete Sun-Sat calendar grid with adjacent month days and today flag', () => {
+  const today = new Date(2026, 10, 13); // Fri Nov 13, 2026
+  const cells = getMonthCalendarGrid(2026, 10, today); // November 2026 (Nov 1 is Sunday)
+  assert.equal(cells.length, 35);
+  assert.equal(cells[0].dateStr, '2026-11-01');
+  assert.equal(cells[0].isWeekend, true);
+  assert.equal(cells[0].isCurrentMonth, true);
+
+  const todayCell = cells.find((c) => c.dateStr === '2026-11-13')!;
+  assert.equal(todayCell.isToday, true);
+  assert.equal(todayCell.dayNumber, 13);
+
+  // Trailing cells into December 2026
+  const lastCell = cells[cells.length - 1];
+  assert.equal(lastCell.dateStr, '2026-12-05');
+  assert.equal(lastCell.isCurrentMonth, false);
 });

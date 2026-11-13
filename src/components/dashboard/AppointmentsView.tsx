@@ -37,6 +37,7 @@ import {
   formatShortDateRange,
   formatTime12h,
   formatTimeRange12h,
+  getMonthCalendarGrid,
   getWeekDays,
   parseIsoDateLocal,
   toIsoDateStr,
@@ -229,13 +230,20 @@ export const AppointmentsView: React.FC = () => {
   }, [filteredAppointments, weekDays, viewMode, calMode, selectedDate]);
 
   // Live current-time indicator inside hourly grid when current time falls inside [startHour, endHour]
-  const nowIndicatorPct = useMemo(() => {
+  const { nowIndicatorPct, nowTimeLabel } = useMemo(() => {
     const now = new Date();
     const curMin = now.getHours() * 60 + now.getMinutes();
     const minGrid = startHour * 60;
     const maxGrid = endHour * 60;
-    if (curMin < minGrid || curMin > maxGrid) return null;
-    return ((curMin - minGrid) / Math.max(maxGrid - minGrid, 60)) * 100;
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    if (curMin < minGrid || curMin > maxGrid) {
+      return { nowIndicatorPct: null, nowTimeLabel: formatTime12h(`${hh}:${mm}`) };
+    }
+    return {
+      nowIndicatorPct: ((curMin - minGrid) / Math.max(maxGrid - minGrid, 60)) * 100,
+      nowTimeLabel: formatTime12h(`${hh}:${mm}`),
+    };
   }, [startHour, endHour]);
 
   const handleUpdateStatus = async (apptId: string, newStatus: AppointmentStatus) => {
@@ -867,59 +875,69 @@ export const AppointmentsView: React.FC = () => {
         <div className="flex-1 min-w-0 w-full">
           {viewMode === 'calendar' ? (
             <div className={`${SURFACE_CARD} overflow-hidden`}>
-              {/* Calendar Control Bar */}
-              <div className="px-4 sm:px-5 py-3.5 bg-gradient-to-r from-white via-white to-[#FFF9F5] border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              {/* Real Calendar Control Header */}
+              <div className="px-4 sm:px-5 py-3.5 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                {/* Left Segmented Prev / Today / Next */}
+                <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white divide-x divide-slate-200 shadow-2xs overflow-hidden">
                   <button
                     type="button"
                     onClick={() => handleCalendarPrevNext(-1)}
                     aria-label="Previous period"
-                    className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:border-orange-300 hover:text-[#F95700] hover:bg-orange-50/50 transition"
+                    className="px-2.5 py-1.5 text-slate-600 hover:text-[#F95700] hover:bg-orange-50/70 transition"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleCalendarPrevNext(1)}
-                    aria-label="Next period"
-                    className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:border-orange-300 hover:text-[#F95700] hover:bg-orange-50/50 transition"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleTodayClick}
-                    className="px-3.5 py-1.5 rounded-full bg-[#FFF3EC] border border-[#FED7AA] text-[#EA580C] text-xs font-bold hover:bg-[#FFE4D1] transition shadow-2xs"
+                    className="px-3.5 py-1.5 text-xs font-extrabold text-[#111827] hover:text-[#F95700] hover:bg-orange-50/70 transition"
                   >
                     Today
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCalendarPrevNext(1)}
+                    aria-label="Next period"
+                    className="px-2.5 py-1.5 text-slate-600 hover:text-[#F95700] hover:bg-orange-50/70 transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2.5 text-center">
-                  <div className="w-8 h-8 rounded-xl bg-[#FFF3EC] text-[#F95700] hidden sm:flex items-center justify-center">
-                    <Calendar className="w-4 h-4" />
-                  </div>
-                  <div className="text-left sm:text-center">
-                    <p className="text-sm font-extrabold text-[#111827] leading-tight">
-                      {activeToolbarLabel}
-                    </p>
-                    <p className="text-[10.5px] font-semibold text-slate-400">
-                      {calMode === 'week'
-                        ? `This Week • ${weekDays.reduce((s, d) => s + d.count, 0)} active booking${
-                            weekDays.reduce((s, d) => s + d.count, 0) === 1 ? '' : 's'
-                          }`
-                        : calMode === 'month'
-                        ? 'Monthly Overview'
-                        : `Daily Schedule • ${
-                            filteredAppointments.filter(
-                              (a) => a.appointment_date === selectedDate && a.status !== 'cancelled'
-                            ).length
-                          } active`}
-                    </p>
-                  </div>
+                {/* Center Real Calendar Title & Live Metrics */}
+                <div className="text-left sm:text-center">
+                  <p className="text-[15px] font-extrabold text-[#111827] tracking-tight leading-tight">
+                    {activeToolbarLabel}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-500 tabular-nums mt-0.5">
+                    {calMode === 'week'
+                      ? `Week Schedule · ${weekDays.reduce((s, d) => s + d.count, 0)} active booking${
+                          weekDays.reduce((s, d) => s + d.count, 0) === 1 ? '' : 's'
+                        }`
+                      : calMode === 'month'
+                      ? `Monthly Overview · ${
+                          filteredAppointments.filter((a) => {
+                            const ym = `${calMonth.getFullYear()}-${String(
+                              calMonth.getMonth() + 1
+                            ).padStart(2, '0')}`;
+                            return a.appointment_date.startsWith(ym) && a.status !== 'cancelled';
+                          }).length
+                        } bookings this month`
+                      : `Daily Schedule · ${
+                          filteredAppointments.filter(
+                            (a) => a.appointment_date === selectedDate && a.status !== 'cancelled'
+                          ).length
+                        } active booking${
+                          filteredAppointments.filter(
+                            (a) => a.appointment_date === selectedDate && a.status !== 'cancelled'
+                          ).length === 1
+                            ? ''
+                            : 's'
+                        }`}
+                  </p>
                 </div>
 
-                {/* Business-wide Service Filter */}
+                {/* Right Service Filter */}
                 <div className="flex items-center gap-2">
                   {filterServiceId !== 'all' && (
                     <button
@@ -949,76 +967,137 @@ export const AppointmentsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* WEEK VIEW (Premium Time-Grid) */}
+              {/* Subtle Interactive Status Legend Bar */}
+              <div className="px-4 sm:px-5 py-2 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex flex-wrap items-center gap-3">
+                  {(
+                    [
+                      { key: 'confirmed', label: 'Confirmed', dot: 'bg-blue-500' },
+                      { key: 'pending', label: 'Pending', dot: 'bg-amber-500' },
+                      { key: 'completed', label: 'Completed', dot: 'bg-emerald-500' },
+                      { key: 'cancelled', label: 'Cancelled', dot: 'bg-rose-500' },
+                    ] as const
+                  ).map((st) => {
+                    const active = filterStatus === st.key;
+                    return (
+                      <button
+                        key={st.key}
+                        type="button"
+                        onClick={() =>
+                          setFilterStatus((prev) => (prev === st.key ? 'all' : st.key))
+                        }
+                        className={`inline-flex items-center gap-1.5 font-semibold transition ${
+                          active
+                            ? 'text-[#111827] underline decoration-[#F95700] decoration-2 underline-offset-4'
+                            : 'text-slate-500 hover:text-[#111827]'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+                        <span>{st.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-[10.5px] font-medium text-slate-400 hidden sm:inline">
+                  Click any empty slot to create a booking
+                </span>
+              </div>
+
+              {/* WEEK VIEW (Real Calendar Time-Grid) */}
               {calMode === 'week' && (
                 <div className="overflow-x-auto">
-                  <div className="min-w-[780px]">
+                  <div className="min-w-[740px]">
                     {/* Day Columns Header */}
-                    <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-slate-100 bg-slate-50/40">
-                      <div className="p-2 flex items-end justify-end pr-2.5 pb-2">
+                    <div className="grid grid-cols-[68px_repeat(7,minmax(0,1fr))] border-b border-slate-200/80 bg-white">
+                      <div className="sticky left-0 z-30 bg-white border-r border-slate-200/80 p-2 flex items-end justify-end pr-2 pb-2.5">
                         <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
-                          Time
+                          GMT
                         </span>
                       </div>
-                      {weekDays.map((day) => (
-                        <button
-                          key={day.dateStr}
-                          type="button"
-                          onClick={() => setSelectedDate(day.dateStr)}
-                          className={`py-2.5 px-2 text-center transition border-l border-slate-100 ${
-                            day.isToday
-                              ? 'bg-gradient-to-b from-[#FF6514] to-[#F95700] text-white rounded-t-xl shadow-sm'
-                              : selectedDate === day.dateStr
-                              ? 'bg-orange-50/80 text-[#111827]'
-                              : 'hover:bg-white text-[#111827]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center gap-1.5">
+                      {weekDays.map((day) => {
+                        const dateNum = day.dateLabel.replace(/^\D+\s*/, '');
+                        const isSelectedDay = selectedDate === day.dateStr;
+                        return (
+                          <button
+                            key={day.dateStr}
+                            type="button"
+                            onClick={() => setSelectedDate(day.dateStr)}
+                            className={`py-2.5 px-2 text-center transition border-l border-slate-100 flex flex-col items-center gap-1 ${
+                              day.isToday
+                                ? 'bg-[#FFF9F5]'
+                                : isSelectedDay
+                                ? 'bg-slate-50/90'
+                                : 'hover:bg-slate-50/60'
+                            }`}
+                          >
                             <span
-                              className={`text-xs font-extrabold ${
-                                day.isToday ? 'text-white' : 'text-[#111827]'
+                              className={`text-[10.5px] font-extrabold uppercase tracking-wider ${
+                                day.isToday ? 'text-[#F95700]' : 'text-slate-400'
                               }`}
                             >
                               {day.dayShort}
                             </span>
-                            {day.count > 0 && (
+                            <div className="flex items-center gap-1.5">
                               <span
-                                className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center ${
+                                className={`w-8 h-8 rounded-full text-sm font-extrabold tabular-nums inline-flex items-center justify-center transition ${
                                   day.isToday
-                                    ? 'bg-white text-[#F95700] shadow-2xs'
-                                    : 'bg-[#F95700] text-white'
+                                    ? 'bg-[#F95700] text-white shadow-[0_3px_10px_rgba(249,87,0,0.3)]'
+                                    : isSelectedDay
+                                    ? 'bg-[#0E1733] text-white'
+                                    : 'text-[#111827]'
                                 }`}
                               >
-                                {day.count}
+                                {dateNum}
                               </span>
-                            )}
-                          </div>
-                          <p
-                            className={`text-[11px] font-semibold mt-0.5 ${
-                              day.isToday ? 'text-orange-100' : 'text-slate-500'
-                            }`}
-                          >
-                            {day.dateLabel}
-                          </p>
-                        </button>
-                      ))}
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold tabular-nums ${
+                                day.count > 0
+                                  ? day.isToday
+                                    ? 'text-[#F95700]'
+                                    : 'text-slate-500'
+                                  : 'text-slate-300'
+                              }`}
+                            >
+                              {day.count > 0
+                                ? `${day.count} ${day.count === 1 ? 'appt' : 'appts'}`
+                                : 'Open'}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Hourly Time Grid */}
+                    {/* Hourly Time Grid (72px per hour) */}
                     <div
-                      className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] relative"
-                      style={{ height: `${hourSlots.length * 60}px` }}
+                      className="grid grid-cols-[68px_repeat(7,minmax(0,1fr))] relative"
+                      style={{ height: `${hourSlots.length * 72}px` }}
                     >
-                      {/* Left Time Axis */}
-                      <div className="relative border-r border-slate-100 bg-white">
-                        {hourSlots.map((h) => (
+                      {/* Sticky Left Time Axis */}
+                      <div className="relative sticky left-0 z-30 border-r border-slate-200/80 bg-white">
+                        {hourSlots.map((h, i) => (
                           <div
                             key={h}
-                            className="h-[60px] pr-2.5 pt-1 text-right text-[11px] font-semibold text-slate-400 border-b border-slate-100/80"
+                            className="h-[72px] pr-2 text-right border-b border-transparent relative"
                           >
-                            {formatTime12h(`${h}:00`)}
+                            <span
+                              className={`inline-block whitespace-nowrap text-[10.5px] font-semibold tabular-nums text-slate-400 bg-white pr-0.5 ${
+                                i === 0 ? 'pt-1' : '-translate-y-2'
+                              }`}
+                            >
+                              {formatTime12h(`${h}:00`)}
+                            </span>
                           </div>
                         ))}
+                        {nowIndicatorPct !== null && (
+                          <div
+                            aria-hidden="true"
+                            style={{ top: `${nowIndicatorPct}%` }}
+                            className="pointer-events-none absolute right-1 -translate-y-1/2 z-40 px-1.5 py-0.5 rounded-md bg-[#F95700] text-white text-[9px] font-extrabold tabular-nums shadow-xs whitespace-nowrap"
+                          >
+                            {nowTimeLabel}
+                          </div>
+                        )}
                       </div>
 
                       {/* 7 Day Columns */}
@@ -1032,9 +1111,7 @@ export const AppointmentsView: React.FC = () => {
                           <div
                             key={day.dateStr}
                             className={`relative border-l border-slate-100 ${
-                              day.isToday
-                                ? 'bg-gradient-to-b from-[#FFF5EE]/80 to-[#FFF9F5]/40'
-                                : 'bg-white'
+                              day.isToday ? 'bg-[#FFF9F5]/55' : 'bg-white'
                             }`}
                           >
                             {/* Interactive Empty Hour Cells with Half-Hour Dashed Guides */}
@@ -1046,29 +1123,28 @@ export const AppointmentsView: React.FC = () => {
                                   type="button"
                                   onClick={() => openNewBookingAt(day.dateStr, slotTime)}
                                   title={`Book at ${formatTime12h(slotTime)} on ${day.dateLabel}`}
-                                  className="group relative block w-full h-[60px] border-b border-slate-100/90 hover:bg-orange-50/45 transition-colors text-left"
+                                  className="group relative block w-full h-[72px] border-b border-slate-200/70 hover:bg-orange-50/45 transition-colors text-left"
                                 >
-                                  {/* Half-hour dashed divider */}
                                   <span
                                     aria-hidden="true"
-                                    className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100/90"
+                                    className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100"
                                   />
-                                  <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-1.5 top-1 px-1.5 py-0.5 rounded-md bg-white/95 border border-orange-200 text-[9.5px] font-bold text-[#F95700] shadow-2xs">
+                                  <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-1.5 top-1.5 px-1.5 py-0.5 rounded-md bg-white border border-orange-200 text-[9.5px] font-bold text-[#F95700] shadow-2xs tabular-nums">
                                     + {formatTime12h(slotTime)}
                                   </span>
                                 </button>
                               );
                             })}
 
-                            {/* Live Current-Time Indicator */}
+                            {/* Live Current-Time Line across Today */}
                             {day.isToday && nowIndicatorPct !== null && (
                               <div
                                 aria-hidden="true"
                                 style={{ top: `${nowIndicatorPct}%` }}
                                 className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
                               >
-                                <span className="w-2 h-2 -ml-1 rounded-full bg-[#F95700] ring-2 ring-white shadow-xs" />
-                                <span className="flex-1 h-[1.5px] bg-[#F95700]/75" />
+                                <span className="w-2.5 h-2.5 -ml-1.5 rounded-full bg-[#F95700] ring-2 ring-white shadow-xs" />
+                                <span className="flex-1 h-[2px] bg-[#F95700]" />
                               </div>
                             )}
 
@@ -1088,7 +1164,9 @@ export const AppointmentsView: React.FC = () => {
                                   <button
                                     key={appt.id}
                                     type="button"
-                                    title={`${appt.customer_name} • ${appt.service?.name || 'Service'} (${formatTimeRange12h(
+                                    title={`${appt.customer_name} • ${
+                                      appt.service?.name || 'Service'
+                                    } (${formatTimeRange12h(
                                       appt.appointment_time,
                                       appt.end_time
                                     )})`}
@@ -1102,7 +1180,7 @@ export const AppointmentsView: React.FC = () => {
                                       left: `calc(${leftPct}% + 2px)`,
                                       width: `calc(${widthPct}% - 4px)`,
                                     }}
-                                    className={`absolute rounded-xl border border-black/[0.04] border-l-4 px-1.5 py-1 text-left overflow-hidden transition-all shadow-[0_2px_6px_rgba(15,23,42,0.06)] hover:shadow-md hover:-translate-y-0.5 z-10 ${
+                                    className={`absolute rounded-xl border border-black/[0.06] border-l-4 px-2 py-1.5 text-left overflow-hidden transition-all shadow-[0_1px_4px_rgba(15,23,42,0.06)] hover:shadow-md hover:-translate-y-0.5 z-10 ${
                                       theme.bg
                                     } ${theme.border} ${
                                       isSelected
@@ -1127,7 +1205,7 @@ export const AppointmentsView: React.FC = () => {
                                       {appt.service?.name || 'Service'}
                                     </p>
                                     <p
-                                      className={`text-[9.5px] font-medium leading-tight truncate mt-0.5 ${theme.subText}`}
+                                      className={`text-[9.5px] font-medium tabular-nums leading-tight truncate mt-0.5 ${theme.subText}`}
                                     >
                                       {formatTimeRange12h(appt.appointment_time, appt.end_time)}
                                     </p>
@@ -1143,132 +1221,208 @@ export const AppointmentsView: React.FC = () => {
                 </div>
               )}
 
-              {/* MONTH VIEW */}
-              {calMode === 'month' && (
-                <div className="p-4 sm:p-5 space-y-4">
-                  <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                      <div key={d} className="py-1">
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {(() => {
-                      const year = calMonth.getFullYear();
-                      const month = calMonth.getMonth();
-                      const firstDay = new Date(year, month, 1).getDay();
-                      const daysInMonth = new Date(year, month + 1, 0).getDate();
-                      const todayStr = toIsoDateStr(new Date());
-                      const cells: (number | null)[] = [];
-                      for (let i = 0; i < firstDay; i++) cells.push(null);
-                      for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+              {/* MONTH VIEW (Real Connected Monthly Calendar Grid) */}
+              {calMode === 'month' && (() => {
+                const monthCells = getMonthCalendarGrid(
+                  calMonth.getFullYear(),
+                  calMonth.getMonth()
+                );
+                const selectedDayAppts = filteredAppointments
+                  .filter((a) => a.appointment_date === selectedDate)
+                  .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                const selectedDayRevenue = selectedDayAppts
+                  .filter((a) => a.status !== 'cancelled')
+                  .reduce((sum, a) => sum + Number(a.service_price || 0), 0);
 
-                      return cells.map((day, idx) => {
-                        if (day === null)
-                          return (
-                            <div
-                              key={idx}
-                              className="min-h-[92px] rounded-2xl bg-slate-50/40 border border-slate-100/60"
-                            />
-                          );
-                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(
-                          day
-                        ).padStart(2, '0')}`;
-                        const dayAppts = filteredAppointments.filter(
-                          (a) => a.appointment_date === dateStr
-                        );
-                        const isSelected = selectedDate === dateStr;
-                        const isToday = dateStr === todayStr;
-
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setSelectedDate(dateStr);
-                              if (dayAppts.length > 0) setSelectedAppt(dayAppts[0]);
-                            }}
-                            className={`min-h-[92px] p-2 rounded-2xl border text-left flex flex-col justify-between transition ${
-                              isSelected
-                                ? 'border-[#F95700] bg-[#FFF5EE] ring-2 ring-[#F95700]/20 shadow-xs'
-                                : isToday
-                                ? 'border-orange-300 bg-orange-50/50'
-                                : 'border-slate-200/75 bg-white hover:border-orange-200 hover:bg-slate-50/60'
+                return (
+                  <div className="p-4 sm:p-5 space-y-5">
+                    <div className="rounded-2xl border border-slate-200/85 overflow-hidden bg-white">
+                      {/* Weekday Header Bar */}
+                      <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-50/80">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
+                          <div
+                            key={d}
+                            className={`py-2.5 text-center text-[11px] font-extrabold uppercase tracking-wider border-r last:border-r-0 border-slate-200/70 ${
+                              idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-600'
                             }`}
                           >
-                            <div className="flex items-center justify-between w-full">
-                              <span
-                                className={`text-xs font-extrabold ${
-                                  isToday
-                                    ? 'px-2 py-0.5 rounded-lg bg-[#F95700] text-white shadow-2xs'
-                                    : 'text-[#111827]'
-                                }`}
-                              >
-                                {day}
-                              </span>
-                              {dayAppts.length > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-[#F95700]/15 text-[#F95700] text-[10px] font-extrabold">
-                                  {dayAppts.length}
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Connected 7-Column Calendar Cells */}
+                      <div className="grid grid-cols-7">
+                        {monthCells.map((cell) => {
+                          const dayAppts = filteredAppointments
+                            .filter((a) => a.appointment_date === cell.dateStr)
+                            .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                          const isSelected = selectedDate === cell.dateStr;
+
+                          return (
+                            <div
+                              key={cell.dateStr}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                setSelectedDate(cell.dateStr);
+                                if (!cell.isCurrentMonth) {
+                                  setCalMonth(parseIsoDateLocal(cell.dateStr));
+                                }
+                                if (dayAppts.length > 0) setSelectedAppt(dayAppts[0]);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setSelectedDate(cell.dateStr);
+                                  if (!cell.isCurrentMonth) {
+                                    setCalMonth(parseIsoDateLocal(cell.dateStr));
+                                  }
+                                }
+                              }}
+                              className={`group min-h-[114px] p-2 border-r border-b border-slate-200/70 [&:nth-child(7n)]:border-r-0 text-left flex flex-col justify-between transition cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#FFF5EE]'
+                                  : !cell.isCurrentMonth
+                                  ? 'bg-slate-50/60'
+                                  : cell.isWeekend
+                                  ? 'bg-slate-50/30 hover:bg-orange-50/30'
+                                  : 'bg-white hover:bg-orange-50/25'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span
+                                  className={`w-7 h-7 rounded-full text-xs font-extrabold tabular-nums inline-flex items-center justify-center transition ${
+                                    cell.isToday
+                                      ? 'bg-[#F95700] text-white shadow-[0_2px_8px_rgba(249,87,0,0.3)]'
+                                      : isSelected
+                                      ? 'bg-[#0E1733] text-white'
+                                      : cell.isCurrentMonth
+                                      ? 'text-[#111827]'
+                                      : 'text-slate-300'
+                                  }`}
+                                >
+                                  {cell.dayNumber}
                                 </span>
-                              )}
-                            </div>
 
-                            <div className="space-y-1 mt-1.5 w-full">
-                              {dayAppts.slice(0, 2).map((a) => {
-                                const { theme } = computeCalendarEventLayout(a, 8, 18);
-                                return (
-                                  <p
-                                    key={a.id}
-                                    className={`text-[10px] font-bold truncate px-1.5 py-0.5 rounded-md border-l-2 ${theme.bg} ${theme.border} ${theme.titleText}`}
+                                <div className="flex items-center gap-1">
+                                  {dayAppts.length > 0 && (
+                                    <span className="text-[10px] font-bold tabular-nums text-slate-400">
+                                      {dayAppts.length}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openNewBookingAt(cell.dateStr, '09:00');
+                                    }}
+                                    title={`New booking on ${cell.dateStr}`}
+                                    aria-label={`New booking on ${cell.dateStr}`}
+                                    className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-md bg-white border border-slate-200 text-[#F95700] hover:border-orange-300 flex items-center justify-center transition"
                                   >
-                                    {a.appointment_time.slice(0, 5)} {a.customer_name}
-                                  </p>
-                                );
-                              })}
-                              {dayAppts.length > 2 && (
-                                <p className="text-[9.5px] font-bold text-[#F95700] px-1">
-                                  +{dayAppts.length - 2} more
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
 
-                  {/* Selected Day Appointments List */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <h4 className="text-xs font-extrabold text-[#111827]">
-                        Appointments on {selectedDate}
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => openNewBookingAt(selectedDate, '09:00')}
-                        className="text-[11px] font-bold text-[#F95700] hover:underline inline-flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Add for {selectedDate}</span>
-                      </button>
+                              <div className="space-y-1 mt-1.5 w-full">
+                                {dayAppts.slice(0, 3).map((a) => {
+                                  const { theme } = computeCalendarEventLayout(a, 8, 18);
+                                  const dotColor =
+                                    a.status === 'completed'
+                                      ? 'bg-emerald-500'
+                                      : a.status === 'confirmed'
+                                      ? 'bg-blue-500'
+                                      : a.status === 'pending'
+                                      ? 'bg-amber-500'
+                                      : 'bg-rose-500';
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedDate(cell.dateStr);
+                                        setSelectedAppt(a);
+                                      }}
+                                      className={`w-full text-left flex items-center gap-1 text-[10px] font-bold truncate px-1.5 py-0.5 rounded-md border border-black/[0.04] transition ${
+                                        theme.bg
+                                      } ${theme.titleText} ${
+                                        selectedAppt?.id === a.id
+                                          ? 'ring-1 ring-[#F95700]'
+                                          : 'hover:brightness-95'
+                                      } ${a.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                                      <span className="tabular-nums shrink-0">
+                                        {a.appointment_time.slice(0, 5)}
+                                      </span>
+                                      <span className="truncate">{a.customer_name}</span>
+                                    </button>
+                                  );
+                                })}
+                                {dayAppts.length > 3 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedDate(cell.dateStr);
+                                      setCalMode('day');
+                                    }}
+                                    className="text-[10px] font-bold text-[#F95700] hover:underline px-1"
+                                  >
+                                    +{dayAppts.length - 3} more
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    {filteredAppointments.filter((a) => a.appointment_date === selectedDate)
-                      .length === 0 ? (
-                      <p className="text-xs text-slate-500">No appointments scheduled for this date.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {filteredAppointments
-                          .filter((a) => a.appointment_date === selectedDate)
-                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-                          .map((a) => {
+
+                    {/* Selected Day Agenda Bar */}
+                    <div className="pt-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-[#111827]">
+                            {parseIsoDateLocal(selectedDate).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 tabular-nums">
+                            {selectedDayAppts.length} booking{selectedDayAppts.length === 1 ? '' : 's'}
+                            {selectedDayRevenue > 0 ? ` · ${formatGHS(selectedDayRevenue)} value` : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openNewBookingAt(selectedDate, '09:00')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF3EC] text-[#EA580C] text-[11px] font-extrabold hover:bg-[#FFE4D1] transition"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>New Booking for Day</span>
+                        </button>
+                      </div>
+
+                      {selectedDayAppts.length === 0 ? (
+                        <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500">
+                          No appointments scheduled for this date. Click New Booking for Day to add one.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {selectedDayAppts.map((a) => {
                             const { theme } = computeCalendarEventLayout(a, 8, 18);
                             return (
                               <button
                                 key={a.id}
                                 type="button"
                                 onClick={() => setSelectedAppt(a)}
-                                className={`p-3 rounded-xl border border-black/[0.04] border-l-4 text-left transition ${
+                                className={`p-3 rounded-xl border border-black/[0.05] border-l-4 text-left transition ${
                                   theme.bg
                                 } ${theme.border} ${
                                   selectedAppt?.id === a.id
@@ -1276,54 +1430,102 @@ export const AppointmentsView: React.FC = () => {
                                     : 'hover:shadow-xs'
                                 }`}
                               >
-                                <p className={`text-xs font-extrabold ${theme.titleText}`}>
-                                  {formatTimeRange12h(a.appointment_time, a.end_time)} &bull;{' '}
+                                <p className={`text-xs font-extrabold tabular-nums ${theme.titleText}`}>
+                                  {formatTimeRange12h(a.appointment_time, a.end_time)} ·{' '}
                                   {a.customer_name}
                                 </p>
                                 <p className={`text-[11px] font-semibold mt-0.5 ${theme.subText}`}>
-                                  {a.service?.name || 'Service'} &bull; {formatGHS(a.service_price)}
+                                  {a.service?.name || 'Service'} · {formatGHS(a.service_price)}
                                 </p>
                               </button>
                             );
                           })}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {/* DAY VIEW (Premium Hourly Timeline Grid) */}
+              {/* DAY VIEW (Executive Daily Schedule Timeline) */}
               {calMode === 'day' && (() => {
                 const dayAppts = filteredAppointments
                   .filter((a) => a.appointment_date === selectedDate)
                   .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
                 const positioned = assignDayEventColumns(dayAppts, startHour, endHour);
                 const isTodaySelected = selectedDate === toIsoDateStr(new Date());
+                const dayRevenue = dayAppts
+                  .filter((a) => a.status !== 'cancelled')
+                  .reduce((sum, a) => sum + Number(a.service_price || 0), 0);
 
                 return (
                   <div className="overflow-hidden">
+                    {/* Day Context Sub-Header */}
+                    <div className="px-4 sm:px-5 py-3 bg-[#FFF9F5]/60 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
+                            isTodaySelected
+                              ? 'bg-[#F95700] text-white'
+                              : 'bg-white border border-slate-200 text-[#111827]'
+                          }`}
+                        >
+                          {parseIsoDateLocal(selectedDate).toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-600 tabular-nums">
+                          {dayAppts.length} booking{dayAppts.length === 1 ? '' : 's'}
+                          {dayRevenue > 0 ? ` · ${formatGHS(dayRevenue)} scheduled` : ''}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openNewBookingAt(selectedDate, '09:00')}
+                        className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#F95700] hover:underline"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Slot</span>
+                      </button>
+                    </div>
+
                     <div
                       className="grid grid-cols-[72px_1fr] relative"
-                      style={{ height: `${hourSlots.length * 64}px` }}
+                      style={{ height: `${hourSlots.length * 72}px` }}
                     >
                       {/* Left Time Axis */}
-                      <div className="relative border-r border-slate-100 bg-white">
-                        {hourSlots.map((h) => (
+                      <div className="relative border-r border-slate-200/80 bg-white">
+                        {hourSlots.map((h, i) => (
                           <div
                             key={h}
-                            className="h-[64px] pr-2.5 pt-1 text-right text-[11px] font-semibold text-slate-400 border-b border-slate-100/80"
+                            className="h-[72px] pr-2.5 text-right border-b border-transparent relative"
                           >
-                            {formatTime12h(`${h}:00`)}
+                            <span
+                              className={`inline-block whitespace-nowrap text-[10.5px] font-semibold tabular-nums text-slate-400 bg-white pr-0.5 ${
+                                i === 0 ? 'pt-1' : '-translate-y-2'
+                              }`}
+                            >
+                              {formatTime12h(`${h}:00`)}
+                            </span>
                           </div>
                         ))}
+                        {isTodaySelected && nowIndicatorPct !== null && (
+                          <div
+                            aria-hidden="true"
+                            style={{ top: `${nowIndicatorPct}%` }}
+                            className="pointer-events-none absolute right-1 -translate-y-1/2 z-30 px-1.5 py-0.5 rounded-md bg-[#F95700] text-white text-[9px] font-extrabold tabular-nums shadow-xs whitespace-nowrap"
+                          >
+                            {nowTimeLabel}
+                          </div>
+                        )}
                       </div>
 
                       {/* Single Day Timeline Column */}
                       <div
                         className={`relative ${
-                          isTodaySelected
-                            ? 'bg-gradient-to-b from-[#FFF5EE]/75 to-[#FFF9F5]/35'
-                            : 'bg-white'
+                          isTodaySelected ? 'bg-[#FFF9F5]/55' : 'bg-white'
                         }`}
                       >
                         {hourSlots.map((h) => {
@@ -1333,13 +1535,13 @@ export const AppointmentsView: React.FC = () => {
                               key={h}
                               type="button"
                               onClick={() => openNewBookingAt(selectedDate, slotTime)}
-                              className="group relative block w-full h-[64px] border-b border-slate-100/90 hover:bg-orange-50/45 transition-colors text-left"
+                              className="group relative block w-full h-[72px] border-b border-slate-200/70 hover:bg-orange-50/45 transition-colors text-left"
                             >
                               <span
                                 aria-hidden="true"
-                                className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100/90"
+                                className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100"
                               />
-                              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-3 top-2 px-2 py-0.5 rounded-lg bg-white border border-orange-200 text-[10px] font-bold text-[#F95700] shadow-2xs">
+                              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-3 top-2 px-2 py-0.5 rounded-lg bg-white border border-orange-200 text-[10px] font-bold text-[#F95700] shadow-2xs tabular-nums">
                                 + Book {formatTime12h(slotTime)}
                               </span>
                             </button>
@@ -1353,7 +1555,7 @@ export const AppointmentsView: React.FC = () => {
                             className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
                           >
                             <span className="w-2.5 h-2.5 -ml-1.5 rounded-full bg-[#F95700] ring-2 ring-white shadow-xs" />
-                            <span className="flex-1 h-[1.5px] bg-[#F95700]/80" />
+                            <span className="flex-1 h-[2px] bg-[#F95700]" />
                           </div>
                         )}
 
@@ -1374,7 +1576,7 @@ export const AppointmentsView: React.FC = () => {
                                   left: `calc(${leftPct}% + 8px)`,
                                   width: `calc(${widthPct}% - 16px)`,
                                 }}
-                                className={`absolute rounded-2xl border border-black/[0.04] border-l-4 px-3.5 py-2 text-left flex items-center justify-between gap-3 overflow-hidden transition-all shadow-[0_2px_8px_rgba(15,23,42,0.06)] hover:shadow-md z-10 ${
+                                className={`absolute rounded-2xl border border-black/[0.06] border-l-4 px-3.5 py-2 text-left flex items-center justify-between gap-3 overflow-hidden transition-all shadow-[0_2px_8px_rgba(15,23,42,0.06)] hover:shadow-md z-10 ${
                                   theme.bg
                                 } ${theme.border} ${
                                   isSelected ? 'ring-2 ring-[#F95700] z-20' : ''
@@ -1384,16 +1586,16 @@ export const AppointmentsView: React.FC = () => {
                                   <p className={`text-xs font-extrabold truncate ${theme.titleText}`}>
                                     {appt.customer_name}
                                   </p>
-                                  <p className={`text-[11px] font-semibold truncate mt-0.5 ${theme.subText}`}>
-                                    {appt.service?.name || 'Service'} &bull;{' '}
+                                  <p className={`text-[11px] font-semibold truncate tabular-nums mt-0.5 ${theme.subText}`}>
+                                    {appt.service?.name || 'Service'} ·{' '}
                                     {formatTimeRange12h(appt.appointment_time, appt.end_time)}
                                   </p>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <p className={`text-xs font-extrabold ${theme.titleText}`}>
+                                  <p className={`text-xs font-extrabold tabular-nums ${theme.titleText}`}>
                                     {formatGHS(appt.service_price)}
                                   </p>
-                                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-white/85 text-[10px] font-bold capitalize text-slate-700">
+                                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-white/90 text-[10px] font-bold capitalize text-slate-700">
                                     {appt.status}
                                   </span>
                                 </div>
@@ -1547,7 +1749,7 @@ export const AppointmentsView: React.FC = () => {
         </div>
 
         {/* RIGHT SIDE: APPOINTMENT DETAILS PANEL (Desktop sticky column, Mobile below/card) */}
-        <div className="w-full xl:w-[320px] shrink-0 xl:sticky xl:top-4">
+        <div className="w-full xl:w-[300px] shrink-0 xl:sticky xl:top-4">
           {renderDetailsPanel()}
         </div>
       </div>

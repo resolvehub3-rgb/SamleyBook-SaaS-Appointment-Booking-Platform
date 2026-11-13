@@ -46,6 +46,14 @@ export interface WeekDayColumn {
   count: number;
 }
 
+export interface MonthCalendarCell {
+  dateStr: string;
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  isWeekend: boolean;
+}
+
 export interface CalendarEventColorTheme {
   bg: string;
   border: string;
@@ -317,6 +325,37 @@ export function getWeekDays(
       dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       isToday: dateStr === todayStr,
       count,
+    };
+  });
+}
+
+/**
+ * Generates a complete Sun-Sat monthly calendar grid (35 or 42 cells)
+ * including leading/trailing days from adjacent months.
+ */
+export function getMonthCalendarGrid(
+  year: number,
+  monthIndex: number,
+  todayDate: Date = new Date()
+): MonthCalendarCell[] {
+  const firstOfMonth = new Date(year, monthIndex, 1);
+  const lastOfMonth = new Date(year, monthIndex + 1, 0);
+  const startOffset = firstOfMonth.getDay(); // 0=Sun..6=Sat
+  const daysInMonth = lastOfMonth.getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const gridStart = addDays(firstOfMonth, -startOffset);
+  const todayStr = toIsoDateStr(todayDate);
+
+  return Array.from({ length: totalCells }).map((_, idx) => {
+    const d = addDays(gridStart, idx);
+    const dateStr = toIsoDateStr(d);
+    const dow = d.getDay();
+    return {
+      dateStr,
+      dayNumber: d.getDate(),
+      isCurrentMonth: d.getMonth() === monthIndex && d.getFullYear() === year,
+      isToday: dateStr === todayStr,
+      isWeekend: dow === 0 || dow === 6,
     };
   });
 }
