@@ -62,6 +62,8 @@ export const AppointmentsView: React.FC = () => {
   const [smsActionMsg, setSmsActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [upcomingOnly, setUpcomingOnly] = useState(false);
   const [newModalOpen, setNewModalOpen] = useState(false);
+  const [modalDefaultDate, setModalDefaultDate] = useState<string | undefined>(undefined);
+  const [modalDefaultTime, setModalDefaultTime] = useState<string | undefined>(undefined);
 
   // Reschedule & Payment breakdown states inside details panel
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -69,6 +71,12 @@ export const AppointmentsView: React.FC = () => {
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  const openNewBookingAt = (dateStr?: string, timeStr?: string) => {
+    setModalDefaultDate(dateStr || selectedDate);
+    setModalDefaultTime(timeStr || '09:00');
+    setNewModalOpen(true);
+  };
 
   const applyOpenMode = (openMode: string | null) => {
     if (openMode === 'list') {
@@ -93,12 +101,34 @@ export const AppointmentsView: React.FC = () => {
   };
 
   useEffect(() => {
-    const openMode = localStorage.getItem('samley_appt_open_mode');
-    if (openMode) {
-      applyOpenMode(openMode);
-    } else {
-      const saved = localStorage.getItem('samley_appt_view');
-      if (saved === 'list' || saved === 'calendar') setViewMode(saved);
+    try {
+      const openMode = localStorage.getItem('samley_appt_open_mode');
+      if (openMode) {
+        applyOpenMode(openMode);
+      } else {
+        const saved = localStorage.getItem('samley_appt_view');
+        if (saved === 'list' || saved === 'calendar') setViewMode(saved);
+      }
+
+      const presetStatus = localStorage.getItem('samley_appt_status_filter');
+      if (presetStatus) {
+        setFilterStatus(presetStatus);
+        localStorage.removeItem('samley_appt_status_filter');
+      }
+      const presetService = localStorage.getItem('samley_appt_service_filter');
+      if (presetService) {
+        setFilterServiceId(presetService);
+        localStorage.removeItem('samley_appt_service_filter');
+      }
+      const presetDate = localStorage.getItem('samley_appt_focus_date');
+      if (presetDate) {
+        setSelectedDate(presetDate);
+        setCalMonth(parseIsoDateLocal(presetDate));
+        setViewMode('calendar');
+        localStorage.removeItem('samley_appt_focus_date');
+      }
+    } catch {
+      // ignore
     }
 
     const onModeEvent = (e: Event) => {
@@ -171,14 +201,17 @@ export const AppointmentsView: React.FC = () => {
     return formatShortDateRange(weekDays[0].dateStr, weekDays[6].dateStr);
   }, [weekDays]);
 
-  // Dynamic hourly window covering 8:00 AM - 5:00 PM (expanding if any booking starts earlier or ends later)
+  // Dynamic hourly window covering 8:00 AM - 6:00 PM (expanding if any booking starts earlier or ends later)
   const { startHour, endHour, hourSlots } = useMemo(() => {
     let minH = 8;
     let maxH = 18;
-    if (viewMode === 'calendar' && calMode === 'week') {
-      const weekDates = new Set(weekDays.map((d) => d.dateStr));
+    if (viewMode === 'calendar' && (calMode === 'week' || calMode === 'day')) {
+      const targetDates =
+        calMode === 'week'
+          ? new Set(weekDays.map((d) => d.dateStr))
+          : new Set([selectedDate]);
       filteredAppointments
-        .filter((a) => weekDates.has(a.appointment_date))
+        .filter((a) => targetDates.has(a.appointment_date))
         .forEach((a) => {
           const sh = Number((a.appointment_time || '08:00').split(':')[0]);
           const eh = Number((a.end_time || '17:00').split(':')[0]);
@@ -193,7 +226,17 @@ export const AppointmentsView: React.FC = () => {
       slots.push(h);
     }
     return { startHour: clampedMin, endHour: clampedMax, hourSlots: slots };
-  }, [filteredAppointments, weekDays, viewMode, calMode]);
+  }, [filteredAppointments, weekDays, viewMode, calMode, selectedDate]);
+
+  // Live current-time indicator inside hourly grid when current time falls inside [startHour, endHour]
+  const nowIndicatorPct = useMemo(() => {
+    const now = new Date();
+    const curMin = now.getHours() * 60 + now.getMinutes();
+    const minGrid = startHour * 60;
+    const maxGrid = endHour * 60;
+    if (curMin < minGrid || curMin > maxGrid) return null;
+    return ((curMin - minGrid) / Math.max(maxGrid - minGrid, 60)) * 100;
+  }, [startHour, endHour]);
 
   const handleUpdateStatus = async (apptId: string, newStatus: AppointmentStatus) => {
     try {
@@ -765,7 +808,7 @@ export const AppointmentsView: React.FC = () => {
           {/* Primary CTA: + New Appointment */}
           <button
             type="button"
-            onClick={() => setNewModalOpen(true)}
+            onClick={() => openNewBookingAt(selectedDate, '09:00')}
             className={`${PRIMARY_ORANGE_BTN} px-4 py-2.5 text-xs`}
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -825,13 +868,13 @@ export const AppointmentsView: React.FC = () => {
           {viewMode === 'calendar' ? (
             <div className={`${SURFACE_CARD} overflow-hidden`}>
               {/* Calendar Control Bar */}
-              <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div className="px-4 sm:px-5 py-3.5 bg-gradient-to-r from-white via-white to-[#FFF9F5] border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleCalendarPrevNext(-1)}
                     aria-label="Previous period"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition"
+                    className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:border-orange-300 hover:text-[#F95700] hover:bg-orange-50/50 transition"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -839,61 +882,84 @@ export const AppointmentsView: React.FC = () => {
                     type="button"
                     onClick={() => handleCalendarPrevNext(1)}
                     aria-label="Next period"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition"
+                    className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:border-orange-300 hover:text-[#F95700] hover:bg-orange-50/50 transition"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={handleTodayClick}
-                    className="px-3.5 py-1.5 rounded-full bg-[#FFF3EC] border border-[#FED7AA] text-[#EA580C] text-xs font-bold hover:bg-[#FFE4D1] transition"
+                    className="px-3.5 py-1.5 rounded-full bg-[#FFF3EC] border border-[#FED7AA] text-[#EA580C] text-xs font-bold hover:bg-[#FFE4D1] transition shadow-2xs"
                   >
                     Today
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 text-center">
-                  <Calendar className="w-4 h-4 text-slate-700 hidden sm:block" />
-                  <div>
+                <div className="flex items-center gap-2.5 text-center">
+                  <div className="w-8 h-8 rounded-xl bg-[#FFF3EC] text-[#F95700] hidden sm:flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div className="text-left sm:text-center">
                     <p className="text-sm font-extrabold text-[#111827] leading-tight">
                       {activeToolbarLabel}
                     </p>
                     <p className="text-[10.5px] font-semibold text-slate-400">
                       {calMode === 'week'
-                        ? 'This Week'
+                        ? `This Week • ${weekDays.reduce((s, d) => s + d.count, 0)} active booking${
+                            weekDays.reduce((s, d) => s + d.count, 0) === 1 ? '' : 's'
+                          }`
                         : calMode === 'month'
                         ? 'Monthly Overview'
-                        : 'Daily Schedule'}
+                        : `Daily Schedule • ${
+                            filteredAppointments.filter(
+                              (a) => a.appointment_date === selectedDate && a.status !== 'cancelled'
+                            ).length
+                          } active`}
                     </p>
                   </div>
                 </div>
 
                 {/* Business-wide Service Filter */}
-                <div className="relative flex items-center">
-                  <Filter className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
-                  <select
-                    value={filterServiceId}
-                    onChange={(e) => setFilterServiceId(e.target.value)}
-                    aria-label="Filter by service"
-                    className="pl-8 pr-7 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-                  >
-                    <option value="all">All Services</option>
-                    {services.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex items-center gap-2">
+                  {filterServiceId !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterServiceId('all')}
+                      className="text-[11px] font-bold text-[#F95700] hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <div className="relative flex items-center">
+                    <Filter className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+                    <select
+                      value={filterServiceId}
+                      onChange={(e) => setFilterServiceId(e.target.value)}
+                      aria-label="Filter by service"
+                      className="pl-8 pr-7 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:border-orange-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                    >
+                      <option value="all">All Services</option>
+                      {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* WEEK VIEW (Matches Reference Time-Grid) */}
+              {/* WEEK VIEW (Premium Time-Grid) */}
               {calMode === 'week' && (
                 <div className="overflow-x-auto">
-                  <div className="min-w-[760px]">
+                  <div className="min-w-[780px]">
                     {/* Day Columns Header */}
-                    <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-slate-100">
-                      <div className="p-2" />
+                    <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-slate-100 bg-slate-50/40">
+                      <div className="p-2 flex items-end justify-end pr-2.5 pb-2">
+                        <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
+                          Time
+                        </span>
+                      </div>
                       {weekDays.map((day) => (
                         <button
                           key={day.dateStr}
@@ -901,10 +967,10 @@ export const AppointmentsView: React.FC = () => {
                           onClick={() => setSelectedDate(day.dateStr)}
                           className={`py-2.5 px-2 text-center transition border-l border-slate-100 ${
                             day.isToday
-                              ? 'bg-[#F95700] text-white rounded-t-xl shadow-xs'
+                              ? 'bg-gradient-to-b from-[#FF6514] to-[#F95700] text-white rounded-t-xl shadow-sm'
                               : selectedDate === day.dateStr
-                              ? 'bg-orange-50/70 text-[#111827]'
-                              : 'hover:bg-slate-50 text-[#111827]'
+                              ? 'bg-orange-50/80 text-[#111827]'
+                              : 'hover:bg-white text-[#111827]'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-1.5">
@@ -919,7 +985,7 @@ export const AppointmentsView: React.FC = () => {
                               <span
                                 className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold inline-flex items-center justify-center ${
                                   day.isToday
-                                    ? 'bg-white text-[#F95700]'
+                                    ? 'bg-white text-[#F95700] shadow-2xs'
                                     : 'bg-[#F95700] text-white'
                                 }`}
                               >
@@ -941,14 +1007,14 @@ export const AppointmentsView: React.FC = () => {
                     {/* Hourly Time Grid */}
                     <div
                       className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] relative"
-                      style={{ height: `${hourSlots.length * 56}px` }}
+                      style={{ height: `${hourSlots.length * 60}px` }}
                     >
                       {/* Left Time Axis */}
                       <div className="relative border-r border-slate-100 bg-white">
                         {hourSlots.map((h) => (
                           <div
                             key={h}
-                            className="h-[56px] pr-2.5 pt-1 text-right text-[11px] font-semibold text-slate-500 border-b border-slate-100/70"
+                            className="h-[60px] pr-2.5 pt-1 text-right text-[11px] font-semibold text-slate-400 border-b border-slate-100/80"
                           >
                             {formatTime12h(`${h}:00`)}
                           </div>
@@ -966,57 +1032,109 @@ export const AppointmentsView: React.FC = () => {
                           <div
                             key={day.dateStr}
                             className={`relative border-l border-slate-100 ${
-                              day.isToday ? 'bg-[#FFF5EE]/65' : 'bg-white'
+                              day.isToday
+                                ? 'bg-gradient-to-b from-[#FFF5EE]/80 to-[#FFF9F5]/40'
+                                : 'bg-white'
                             }`}
                           >
-                            {/* Hour gridlines */}
-                            {hourSlots.map((h) => (
-                              <div
-                                key={h}
-                                className="h-[56px] border-b border-slate-100/80"
-                              />
-                            ))}
-
-                            {/* Positioned Appointment Cards (side-by-side on overlap) */}
-                            {positioned.map(({ appointment: appt, topPct, heightPct, leftPct, widthPct, theme }) => {
-                              const isSelected = selectedAppt?.id === appt.id;
+                            {/* Interactive Empty Hour Cells with Half-Hour Dashed Guides */}
+                            {hourSlots.map((h) => {
+                              const slotTime = `${String(h).padStart(2, '0')}:00`;
                               return (
                                 <button
-                                  key={appt.id}
+                                  key={h}
                                   type="button"
-                                  onClick={() => setSelectedAppt(appt)}
-                                  style={{
-                                    top: `${topPct}%`,
-                                    height: `${heightPct}%`,
-                                    left: `calc(${leftPct}% + 3px)`,
-                                    width: `calc(${widthPct}% - 6px)`,
-                                  }}
-                                  className={`absolute rounded-xl border-l-4 px-2 py-1 text-left overflow-hidden transition-all shadow-xs hover:shadow-md z-10 ${
-                                    theme.bg
-                                  } ${theme.border} ${
-                                    isSelected
-                                      ? 'ring-2 ring-[#F95700] ring-offset-1 z-20'
-                                      : ''
-                                  } ${appt.status === 'cancelled' ? 'opacity-50 line-through' : ''}`}
+                                  onClick={() => openNewBookingAt(day.dateStr, slotTime)}
+                                  title={`Book at ${formatTime12h(slotTime)} on ${day.dateLabel}`}
+                                  className="group relative block w-full h-[60px] border-b border-slate-100/90 hover:bg-orange-50/45 transition-colors text-left"
                                 >
-                                  <p
-                                    className={`text-[11px] font-extrabold leading-tight truncate ${theme.titleText}`}
-                                  >
-                                    {appt.customer_name}
-                                  </p>
-                                  <p
-                                    className={`text-[10px] font-semibold leading-tight truncate mt-0.5 ${theme.subText}`}
-                                  >
-                                    {appt.service?.name || 'Service'}
-                                  </p>
-                                  <p
-                                    className={`text-[9.5px] font-medium leading-tight truncate mt-0.5 ${theme.subText}`}
-                                  >
-                                    {formatTimeRange12h(appt.appointment_time, appt.end_time)}
-                                  </p>
+                                  {/* Half-hour dashed divider */}
+                                  <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100/90"
+                                  />
+                                  <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-1.5 top-1 px-1.5 py-0.5 rounded-md bg-white/95 border border-orange-200 text-[9.5px] font-bold text-[#F95700] shadow-2xs">
+                                    + {formatTime12h(slotTime)}
+                                  </span>
                                 </button>
                               );
                             })}
+
+                            {/* Live Current-Time Indicator */}
+                            {day.isToday && nowIndicatorPct !== null && (
+                              <div
+                                aria-hidden="true"
+                                style={{ top: `${nowIndicatorPct}%` }}
+                                className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
+                              >
+                                <span className="w-2 h-2 -ml-1 rounded-full bg-[#F95700] ring-2 ring-white shadow-xs" />
+                                <span className="flex-1 h-[1.5px] bg-[#F95700]/75" />
+                              </div>
+                            )}
+
+                            {/* Positioned Appointment Cards (side-by-side on overlap) */}
+                            {positioned.map(
+                              ({ appointment: appt, topPct, heightPct, leftPct, widthPct, theme }) => {
+                                const isSelected = selectedAppt?.id === appt.id;
+                                const dotColor =
+                                  appt.status === 'completed'
+                                    ? 'bg-emerald-500'
+                                    : appt.status === 'confirmed'
+                                    ? 'bg-blue-500'
+                                    : appt.status === 'pending'
+                                    ? 'bg-amber-500'
+                                    : 'bg-rose-500';
+                                return (
+                                  <button
+                                    key={appt.id}
+                                    type="button"
+                                    title={`${appt.customer_name} • ${appt.service?.name || 'Service'} (${formatTimeRange12h(
+                                      appt.appointment_time,
+                                      appt.end_time
+                                    )})`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedAppt(appt);
+                                    }}
+                                    style={{
+                                      top: `calc(${topPct}% + 2px)`,
+                                      height: `calc(${heightPct}% - 4px)`,
+                                      left: `calc(${leftPct}% + 2px)`,
+                                      width: `calc(${widthPct}% - 4px)`,
+                                    }}
+                                    className={`absolute rounded-xl border border-black/[0.04] border-l-4 px-1.5 py-1 text-left overflow-hidden transition-all shadow-[0_2px_6px_rgba(15,23,42,0.06)] hover:shadow-md hover:-translate-y-0.5 z-10 ${
+                                      theme.bg
+                                    } ${theme.border} ${
+                                      isSelected
+                                        ? 'ring-2 ring-[#F95700] ring-offset-1 shadow-md z-20'
+                                        : ''
+                                    } ${appt.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
+                                  >
+                                    <div className="flex items-center justify-between gap-1">
+                                      <p
+                                        className={`text-[11px] font-extrabold leading-tight truncate ${theme.titleText}`}
+                                      >
+                                        {appt.customer_name}
+                                      </p>
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`}
+                                        title={appt.status}
+                                      />
+                                    </div>
+                                    <p
+                                      className={`text-[10px] font-semibold leading-tight truncate mt-0.5 ${theme.subText}`}
+                                    >
+                                      {appt.service?.name || 'Service'}
+                                    </p>
+                                    <p
+                                      className={`text-[9.5px] font-medium leading-tight truncate mt-0.5 ${theme.subText}`}
+                                    >
+                                      {formatTimeRange12h(appt.appointment_time, appt.end_time)}
+                                    </p>
+                                  </button>
+                                );
+                              }
+                            )}
                           </div>
                         );
                       })}
@@ -1028,14 +1146,14 @@ export const AppointmentsView: React.FC = () => {
               {/* MONTH VIEW */}
               {calMode === 'month' && (
                 <div className="p-4 sm:p-5 space-y-4">
-                  <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                  <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                       <div key={d} className="py-1">
                         {d}
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-7 gap-1.5">
+                  <div className="grid grid-cols-7 gap-2">
                     {(() => {
                       const year = calMonth.getFullYear();
                       const month = calMonth.getMonth();
@@ -1047,7 +1165,13 @@ export const AppointmentsView: React.FC = () => {
                       for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
                       return cells.map((day, idx) => {
-                        if (day === null) return <div key={idx} className="min-h-[82px]" />;
+                        if (day === null)
+                          return (
+                            <div
+                              key={idx}
+                              className="min-h-[92px] rounded-2xl bg-slate-50/40 border border-slate-100/60"
+                            />
+                          );
                         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(
                           day
                         ).padStart(2, '0')}`;
@@ -1065,19 +1189,19 @@ export const AppointmentsView: React.FC = () => {
                               setSelectedDate(dateStr);
                               if (dayAppts.length > 0) setSelectedAppt(dayAppts[0]);
                             }}
-                            className={`min-h-[82px] p-2 rounded-xl border text-left flex flex-col justify-between transition ${
+                            className={`min-h-[92px] p-2 rounded-2xl border text-left flex flex-col justify-between transition ${
                               isSelected
-                                ? 'border-[#F95700] bg-[#FFF5EE] ring-1 ring-[#F95700]'
+                                ? 'border-[#F95700] bg-[#FFF5EE] ring-2 ring-[#F95700]/20 shadow-xs'
                                 : isToday
-                                ? 'border-orange-300 bg-orange-50/40'
-                                : 'border-slate-200/70 bg-white hover:bg-slate-50'
+                                ? 'border-orange-300 bg-orange-50/50'
+                                : 'border-slate-200/75 bg-white hover:border-orange-200 hover:bg-slate-50/60'
                             }`}
                           >
                             <div className="flex items-center justify-between w-full">
                               <span
                                 className={`text-xs font-extrabold ${
                                   isToday
-                                    ? 'px-1.5 py-0.5 rounded-md bg-[#F95700] text-white'
+                                    ? 'px-2 py-0.5 rounded-lg bg-[#F95700] text-white shadow-2xs'
                                     : 'text-[#111827]'
                                 }`}
                               >
@@ -1090,17 +1214,20 @@ export const AppointmentsView: React.FC = () => {
                               )}
                             </div>
 
-                            <div className="space-y-0.5 mt-1 w-full">
-                              {dayAppts.slice(0, 2).map((a) => (
-                                <p
-                                  key={a.id}
-                                  className="text-[10px] font-semibold truncate px-1.5 py-0.5 rounded bg-blue-50 text-blue-800"
-                                >
-                                  {a.appointment_time.slice(0, 5)} {a.customer_name}
-                                </p>
-                              ))}
+                            <div className="space-y-1 mt-1.5 w-full">
+                              {dayAppts.slice(0, 2).map((a) => {
+                                const { theme } = computeCalendarEventLayout(a, 8, 18);
+                                return (
+                                  <p
+                                    key={a.id}
+                                    className={`text-[10px] font-bold truncate px-1.5 py-0.5 rounded-md border-l-2 ${theme.bg} ${theme.border} ${theme.titleText}`}
+                                  >
+                                    {a.appointment_time.slice(0, 5)} {a.customer_name}
+                                  </p>
+                                );
+                              })}
                               {dayAppts.length > 2 && (
-                                <p className="text-[9.5px] font-bold text-slate-400 px-1">
+                                <p className="text-[9.5px] font-bold text-[#F95700] px-1">
                                   +{dayAppts.length - 2} more
                                 </p>
                               )}
@@ -1113,9 +1240,19 @@ export const AppointmentsView: React.FC = () => {
 
                   {/* Selected Day Appointments List */}
                   <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-xs font-extrabold text-[#111827] mb-2">
-                      Appointments on {selectedDate}
-                    </h4>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h4 className="text-xs font-extrabold text-[#111827]">
+                        Appointments on {selectedDate}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => openNewBookingAt(selectedDate, '09:00')}
+                        className="text-[11px] font-bold text-[#F95700] hover:underline inline-flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add for {selectedDate}</span>
+                      </button>
+                    </div>
                     {filteredAppointments.filter((a) => a.appointment_date === selectedDate)
                       .length === 0 ? (
                       <p className="text-xs text-slate-500">No appointments scheduled for this date.</p>
@@ -1124,89 +1261,151 @@ export const AppointmentsView: React.FC = () => {
                         {filteredAppointments
                           .filter((a) => a.appointment_date === selectedDate)
                           .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-                          .map((a) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onClick={() => setSelectedAppt(a)}
-                              className={`p-3 rounded-xl border text-left transition ${
-                                selectedAppt?.id === a.id
-                                  ? 'border-[#F95700] bg-[#FFF5EE]'
-                                  : 'border-slate-200 hover:bg-slate-50'
-                              }`}
-                            >
-                              <p className="text-xs font-extrabold text-[#111827]">
-                                {formatTimeRange12h(a.appointment_time, a.end_time)} &bull;{' '}
-                                {a.customer_name}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {a.service?.name || 'Service'} &bull; {formatGHS(a.service_price)}
-                              </p>
-                            </button>
-                          ))}
+                          .map((a) => {
+                            const { theme } = computeCalendarEventLayout(a, 8, 18);
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => setSelectedAppt(a)}
+                                className={`p-3 rounded-xl border border-black/[0.04] border-l-4 text-left transition ${
+                                  theme.bg
+                                } ${theme.border} ${
+                                  selectedAppt?.id === a.id
+                                    ? 'ring-2 ring-[#F95700] shadow-xs'
+                                    : 'hover:shadow-xs'
+                                }`}
+                              >
+                                <p className={`text-xs font-extrabold ${theme.titleText}`}>
+                                  {formatTimeRange12h(a.appointment_time, a.end_time)} &bull;{' '}
+                                  {a.customer_name}
+                                </p>
+                                <p className={`text-[11px] font-semibold mt-0.5 ${theme.subText}`}>
+                                  {a.service?.name || 'Service'} &bull; {formatGHS(a.service_price)}
+                                </p>
+                              </button>
+                            );
+                          })}
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* DAY VIEW */}
-              {calMode === 'day' && (
-                <div className="p-5 space-y-3">
-                  {filteredAppointments.filter((a) => a.appointment_date === selectedDate).length ===
-                  0 ? (
-                    <div className="py-12 text-center space-y-2">
-                      <Calendar className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="text-sm font-bold text-[#111827]">
-                        No appointments for {selectedDate}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Use + New Appointment to schedule a booking for this day.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {filteredAppointments
-                        .filter((a) => a.appointment_date === selectedDate)
-                        .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-                        .map((a) => {
-                          const { theme } = computeCalendarEventLayout(a, 8, 18);
-                          const isSelected = selectedAppt?.id === a.id;
+              {/* DAY VIEW (Premium Hourly Timeline Grid) */}
+              {calMode === 'day' && (() => {
+                const dayAppts = filteredAppointments
+                  .filter((a) => a.appointment_date === selectedDate)
+                  .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                const positioned = assignDayEventColumns(dayAppts, startHour, endHour);
+                const isTodaySelected = selectedDate === toIsoDateStr(new Date());
+
+                return (
+                  <div className="overflow-hidden">
+                    <div
+                      className="grid grid-cols-[72px_1fr] relative"
+                      style={{ height: `${hourSlots.length * 64}px` }}
+                    >
+                      {/* Left Time Axis */}
+                      <div className="relative border-r border-slate-100 bg-white">
+                        {hourSlots.map((h) => (
+                          <div
+                            key={h}
+                            className="h-[64px] pr-2.5 pt-1 text-right text-[11px] font-semibold text-slate-400 border-b border-slate-100/80"
+                          >
+                            {formatTime12h(`${h}:00`)}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Single Day Timeline Column */}
+                      <div
+                        className={`relative ${
+                          isTodaySelected
+                            ? 'bg-gradient-to-b from-[#FFF5EE]/75 to-[#FFF9F5]/35'
+                            : 'bg-white'
+                        }`}
+                      >
+                        {hourSlots.map((h) => {
+                          const slotTime = `${String(h).padStart(2, '0')}:00`;
                           return (
                             <button
-                              key={a.id}
+                              key={h}
                               type="button"
-                              onClick={() => setSelectedAppt(a)}
-                              className={`w-full text-left p-4 rounded-2xl border-l-4 transition flex items-center justify-between gap-4 ${
-                                theme.bg
-                              } ${theme.border} ${
-                                isSelected ? 'ring-2 ring-[#F95700]' : 'hover:shadow-sm'
-                              }`}
+                              onClick={() => openNewBookingAt(selectedDate, slotTime)}
+                              className="group relative block w-full h-[64px] border-b border-slate-100/90 hover:bg-orange-50/45 transition-colors text-left"
                             >
-                              <div>
-                                <p className={`text-sm font-extrabold ${theme.titleText}`}>
-                                  {a.customer_name}
-                                </p>
-                                <p className={`text-xs font-semibold mt-0.5 ${theme.subText}`}>
-                                  {a.service?.name || 'Service'} &bull;{' '}
-                                  {formatTimeRange12h(a.appointment_time, a.end_time)}
-                                </p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className={`text-xs font-extrabold ${theme.titleText}`}>
-                                  {formatGHS(a.service_price)}
-                                </p>
-                                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-white/80 text-[10px] font-bold capitalize text-slate-700">
-                                  {a.status}
-                                </span>
-                              </div>
+                              <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100/90"
+                              />
+                              <span className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity absolute right-3 top-2 px-2 py-0.5 rounded-lg bg-white border border-orange-200 text-[10px] font-bold text-[#F95700] shadow-2xs">
+                                + Book {formatTime12h(slotTime)}
+                              </span>
                             </button>
                           );
                         })}
+
+                        {isTodaySelected && nowIndicatorPct !== null && (
+                          <div
+                            aria-hidden="true"
+                            style={{ top: `${nowIndicatorPct}%` }}
+                            className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
+                          >
+                            <span className="w-2.5 h-2.5 -ml-1.5 rounded-full bg-[#F95700] ring-2 ring-white shadow-xs" />
+                            <span className="flex-1 h-[1.5px] bg-[#F95700]/80" />
+                          </div>
+                        )}
+
+                        {positioned.map(
+                          ({ appointment: appt, topPct, heightPct, leftPct, widthPct, theme }) => {
+                            const isSelected = selectedAppt?.id === appt.id;
+                            return (
+                              <button
+                                key={appt.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAppt(appt);
+                                }}
+                                style={{
+                                  top: `calc(${topPct}% + 2px)`,
+                                  height: `calc(${heightPct}% - 4px)`,
+                                  left: `calc(${leftPct}% + 8px)`,
+                                  width: `calc(${widthPct}% - 16px)`,
+                                }}
+                                className={`absolute rounded-2xl border border-black/[0.04] border-l-4 px-3.5 py-2 text-left flex items-center justify-between gap-3 overflow-hidden transition-all shadow-[0_2px_8px_rgba(15,23,42,0.06)] hover:shadow-md z-10 ${
+                                  theme.bg
+                                } ${theme.border} ${
+                                  isSelected ? 'ring-2 ring-[#F95700] z-20' : ''
+                                } ${appt.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
+                              >
+                                <div className="min-w-0">
+                                  <p className={`text-xs font-extrabold truncate ${theme.titleText}`}>
+                                    {appt.customer_name}
+                                  </p>
+                                  <p className={`text-[11px] font-semibold truncate mt-0.5 ${theme.subText}`}>
+                                    {appt.service?.name || 'Service'} &bull;{' '}
+                                    {formatTimeRange12h(appt.appointment_time, appt.end_time)}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className={`text-xs font-extrabold ${theme.titleText}`}>
+                                    {formatGHS(appt.service_price)}
+                                  </p>
+                                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-white/85 text-[10px] font-bold capitalize text-slate-700">
+                                    {appt.status}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          }
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             /* LIST VIEW */
@@ -1356,7 +1555,8 @@ export const AppointmentsView: React.FC = () => {
       {/* New Appointment Modal */}
       <NewAppointmentModal
         isOpen={newModalOpen}
-        defaultDate={selectedDate}
+        defaultDate={modalDefaultDate || selectedDate}
+        defaultTime={modalDefaultTime || '09:00'}
         onClose={() => setNewModalOpen(false)}
       />
     </div>

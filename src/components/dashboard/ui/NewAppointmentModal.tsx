@@ -8,6 +8,7 @@ import { PRIMARY_ORANGE_BTN } from './DashboardTokens';
 interface Props {
   isOpen: boolean;
   defaultDate?: string;
+  defaultTime?: string;
   onClose: () => void;
   onCreated?: () => void;
 }
@@ -15,6 +16,7 @@ interface Props {
 export const NewAppointmentModal: React.FC<Props> = ({
   isOpen,
   defaultDate,
+  defaultTime,
   onClose,
   onCreated,
 }) => {
@@ -25,7 +27,7 @@ export const NewAppointmentModal: React.FC<Props> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [date, setDate] = useState(defaultDate || new Date().toISOString().split('T')[0]);
-  const [time, setTime] = useState('09:00');
+  const [time, setTime] = useState(defaultTime || '09:00');
   const [status, setStatus] = useState<'confirmed' | 'pending'>('confirmed');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('pending');
   const [notes, setNotes] = useState('');
@@ -38,13 +40,13 @@ export const NewAppointmentModal: React.FC<Props> = ({
       setDate(defaultDate || new Date().toISOString().split('T')[0]);
       setCustomerName('');
       setCustomerPhone('');
-      setTime('09:00');
+      setTime(defaultTime || '09:00');
       setStatus('confirmed');
       setPaymentStatus('pending');
       setNotes('');
       setErrorMsg(null);
     }
-  }, [isOpen, defaultDate]);
+  }, [isOpen, defaultDate, defaultTime]);
 
   if (!isOpen) return null;
 
