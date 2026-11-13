@@ -55,50 +55,214 @@ export interface MonthCalendarCell {
 }
 
 export interface CalendarEventColorTheme {
+  name: string;
   bg: string;
   border: string;
+  borderAll: string;
   titleText: string;
   subText: string;
+  pill: string;
+  dot: string;
+  accentHex: string;
+  gradientHeader: string;
 }
 
 export const CALENDAR_EVENT_THEMES: CalendarEventColorTheme[] = [
   {
-    bg: 'bg-[#DBEAFE]',
-    border: 'border-l-[#3B82F6]',
+    name: 'Sapphire Blue',
+    bg: 'bg-gradient-to-br from-[#EFF6FF] to-[#DBEAFE]',
+    border: 'border-l-[#2563EB]',
+    borderAll: 'border-[#93C5FD]/80',
     titleText: 'text-[#1E3A8A]',
     subText: 'text-[#1D4ED8]',
+    pill: 'bg-white/85 text-[#1E40AF] border-[#BFDBFE]',
+    dot: 'bg-[#2563EB]',
+    accentHex: '#2563EB',
+    gradientHeader: 'from-blue-500 via-blue-600 to-indigo-600',
   },
   {
-    bg: 'bg-[#DCFCE7]',
-    border: 'border-l-[#22C55E]',
-    titleText: 'text-[#14532D]',
-    subText: 'text-[#15803D]',
+    name: 'Emerald Mint',
+    bg: 'bg-gradient-to-br from-[#ECFDF5] to-[#D1FAE5]',
+    border: 'border-l-[#059669]',
+    borderAll: 'border-[#6EE7B7]/80',
+    titleText: 'text-[#064E3B]',
+    subText: 'text-[#047857]',
+    pill: 'bg-white/85 text-[#065F46] border-[#A7F3D0]',
+    dot: 'bg-[#059669]',
+    accentHex: '#059669',
+    gradientHeader: 'from-emerald-500 via-emerald-600 to-teal-600',
   },
   {
-    bg: 'bg-[#FED7AA]/85',
-    border: 'border-l-[#F97316]',
+    name: 'Tangerine Orange',
+    bg: 'bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5]',
+    border: 'border-l-[#EA580C]',
+    borderAll: 'border-[#FDBA74]/85',
     titleText: 'text-[#7C2D12]',
-    subText: 'text-[#9A3412]',
+    subText: 'text-[#C2410C]',
+    pill: 'bg-white/85 text-[#9A3412] border-[#FED7AA]',
+    dot: 'bg-[#EA580C]',
+    accentHex: '#EA580C',
+    gradientHeader: 'from-orange-500 via-orange-600 to-amber-500',
   },
   {
-    bg: 'bg-[#EDE9FE]',
-    border: 'border-l-[#8B5CF6]',
+    name: 'Royal Violet',
+    bg: 'bg-gradient-to-br from-[#F5F3FF] to-[#EDE9FE]',
+    border: 'border-l-[#7C3AED]',
+    borderAll: 'border-[#C4B5FD]/85',
     titleText: 'text-[#4C1D95]',
     subText: 'text-[#6D28D9]',
+    pill: 'bg-white/85 text-[#5B21B6] border-[#DDD6FE]',
+    dot: 'bg-[#7C3AED]',
+    accentHex: '#7C3AED',
+    gradientHeader: 'from-violet-500 via-violet-600 to-purple-600',
   },
   {
-    bg: 'bg-[#FCE7F3]',
-    border: 'border-l-[#EC4899]',
-    titleText: 'text-[#831843]',
-    subText: 'text-[#BE185D]',
+    name: 'Rose Coral',
+    bg: 'bg-gradient-to-br from-[#FFF1F2] to-[#FFE4E6]',
+    border: 'border-l-[#E11D48]',
+    borderAll: 'border-[#FDA4AF]/85',
+    titleText: 'text-[#881337]',
+    subText: 'text-[#BE123C]',
+    pill: 'bg-white/85 text-[#9F1239] border-[#FECDD3]',
+    dot: 'bg-[#E11D48]',
+    accentHex: '#E11D48',
+    gradientHeader: 'from-rose-500 via-rose-600 to-pink-600',
   },
   {
-    bg: 'bg-[#CCFBF1]',
-    border: 'border-l-[#14B8A6]',
+    name: 'Teal Lagoon',
+    bg: 'bg-gradient-to-br from-[#F0FDFA] to-[#CCFBF1]',
+    border: 'border-l-[#0D9488]',
+    borderAll: 'border-[#5EEAD4]/85',
     titleText: 'text-[#134E4A]',
     subText: 'text-[#0F766E]',
+    pill: 'bg-white/85 text-[#115E59] border-[#99F6E4]',
+    dot: 'bg-[#0D9488]',
+    accentHex: '#0D9488',
+    gradientHeader: 'from-teal-500 via-teal-600 to-cyan-600',
+  },
+  {
+    name: 'Golden Amber',
+    bg: 'bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7]',
+    border: 'border-l-[#D97706]',
+    borderAll: 'border-[#FCD34D]/90',
+    titleText: 'text-[#78350F]',
+    subText: 'text-[#B45309]',
+    pill: 'bg-white/85 text-[#92400E] border-[#FDE68A]',
+    dot: 'bg-[#D97706]',
+    accentHex: '#D97706',
+    gradientHeader: 'from-amber-500 via-amber-600 to-orange-500',
+  },
+  {
+    name: 'Deep Indigo',
+    bg: 'bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF]',
+    border: 'border-l-[#4F46E5]',
+    borderAll: 'border-[#A5B4FC]/85',
+    titleText: 'text-[#312E81]',
+    subText: 'text-[#4338CA]',
+    pill: 'bg-white/85 text-[#3730A3] border-[#C7D2FE]',
+    dot: 'bg-[#4F46E5]',
+    accentHex: '#4F46E5',
+    gradientHeader: 'from-indigo-500 via-indigo-600 to-blue-700',
+  },
+  {
+    name: 'Magenta Fuchsia',
+    bg: 'bg-gradient-to-br from-[#FDF4FF] to-[#FAE8FF]',
+    border: 'border-l-[#C026D3]',
+    borderAll: 'border-[#F0ABFC]/85',
+    titleText: 'text-[#701A75]',
+    subText: 'text-[#A21CAF]',
+    pill: 'bg-white/85 text-[#86198F] border-[#F5D0FE]',
+    dot: 'bg-[#C026D3]',
+    accentHex: '#C026D3',
+    gradientHeader: 'from-fuchsia-500 via-fuchsia-600 to-purple-600',
+  },
+  {
+    name: 'Sky Azure',
+    bg: 'bg-gradient-to-br from-[#F0F9FF] to-[#E0F2FE]',
+    border: 'border-l-[#0284C7]',
+    borderAll: 'border-[#7DD3FC]/85',
+    titleText: 'text-[#0C4A6E]',
+    subText: 'text-[#0369A1]',
+    pill: 'bg-white/85 text-[#075985] border-[#BAE6FD]',
+    dot: 'bg-[#0284C7]',
+    accentHex: '#0284C7',
+    gradientHeader: 'from-sky-500 via-sky-600 to-blue-600',
+  },
+  {
+    name: 'Berry Pink',
+    bg: 'bg-gradient-to-br from-[#FDF2F8] to-[#FCE7F3]',
+    border: 'border-l-[#DB2777]',
+    borderAll: 'border-[#F9A8D4]/85',
+    titleText: 'text-[#831843]',
+    subText: 'text-[#BE185D]',
+    pill: 'bg-white/85 text-[#9D174D] border-[#FBCFE8]',
+    dot: 'bg-[#DB2777]',
+    accentHex: '#DB2777',
+    gradientHeader: 'from-pink-500 via-pink-600 to-rose-500',
+  },
+  {
+    name: 'Cyan Aqua',
+    bg: 'bg-gradient-to-br from-[#ECFEFF] to-[#CFFAFE]',
+    border: 'border-l-[#0891B2]',
+    borderAll: 'border-[#67E8F9]/85',
+    titleText: 'text-[#164E63]',
+    subText: 'text-[#0E7490]',
+    pill: 'bg-white/85 text-[#155E75] border-[#A5F3FC]',
+    dot: 'bg-[#0891B2]',
+    accentHex: '#0891B2',
+    gradientHeader: 'from-cyan-500 via-cyan-600 to-teal-600',
   },
 ];
+
+export function hashCalendarSeed(seedStr: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash ^= seedStr.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+export function getCalendarThemeBySeed(seedStr: string): CalendarEventColorTheme {
+  const hash = hashCalendarSeed(seedStr || 'default');
+  return CALENDAR_EVENT_THEMES[hash % CALENDAR_EVENT_THEMES.length];
+}
+
+export function getAppointmentThemeSeed(appointment: Pick<Appointment, 'id' | 'customer_name' | 'customer_phone' | 'service_id' | 'appointment_time'>): string {
+  return appointment.id
+    ? `${appointment.id}:${appointment.customer_name || ''}:${appointment.service_id || ''}`
+    : `${appointment.customer_name || ''}:${appointment.customer_phone || ''}:${appointment.service_id || ''}:${appointment.appointment_time || ''}`;
+}
+
+/**
+ * Assigns distinct, non-colliding color themes across same-day appointments (cycling cleanly up to 12 distinct colors per day).
+ */
+export function buildDayColorMap<T extends Pick<Appointment, 'id' | 'customer_name' | 'customer_phone' | 'service_id' | 'appointment_time'>>(
+  dayAppointments: T[]
+): Map<string, CalendarEventColorTheme> {
+  const map = new Map<string, CalendarEventColorTheme>();
+  const usedIndices = new Set<number>();
+  const sorted = [...dayAppointments].sort((a, b) =>
+    (a.appointment_time || '').localeCompare(b.appointment_time || '') ||
+    (a.id || '').localeCompare(b.id || '')
+  );
+
+  for (const appt of sorted) {
+    const seed = getAppointmentThemeSeed(appt);
+    let idx = hashCalendarSeed(seed) % CALENDAR_EVENT_THEMES.length;
+    if (usedIndices.size < CALENDAR_EVENT_THEMES.length) {
+      let guard = 0;
+      while (usedIndices.has(idx) && guard < CALENDAR_EVENT_THEMES.length) {
+        idx = (idx + 1) % CALENDAR_EVENT_THEMES.length;
+        guard += 1;
+      }
+      usedIndices.add(idx);
+    }
+    const key = appt.id || seed;
+    map.set(key, CALENDAR_EVENT_THEMES[idx]);
+  }
+  return map;
+}
 
 export function toIsoDateStr(d: Date): string {
   const y = d.getFullYear();
@@ -433,13 +597,7 @@ export function computeCalendarEventLayout(
   const topPct = ((clampedStart - gridStartMin) / totalSpan) * 100;
   const heightPct = Math.max(((clampedEnd - clampedStart) / totalSpan) * 100, 6);
 
-  // Deterministic theme based on service_id or customer_name hash so different services stand out cleanly
-  const seedStr = appointment.service_id || appointment.service?.name || appointment.id;
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
-  }
-  const theme = CALENDAR_EVENT_THEMES[hash % CALENDAR_EVENT_THEMES.length];
+  const theme = getCalendarThemeBySeed(getAppointmentThemeSeed(appointment));
 
   return { topPct, heightPct, theme };
 }
@@ -454,7 +612,8 @@ export interface PositionedCalendarEvent {
 }
 
 /**
- * Packs same-day appointments into side-by-side lanes when their times overlap.
+ * Packs same-day appointments into side-by-side lanes when their times overlap,
+ * and assigns distinct, non-colliding vibrant colors for every booking on that day.
  */
 export function assignDayEventColumns(
   dayAppointments: Appointment[],
@@ -462,6 +621,8 @@ export function assignDayEventColumns(
   endHour: number = 18
 ): PositionedCalendarEvent[] {
   if (dayAppointments.length === 0) return [];
+
+  const dayColorMap = buildDayColorMap(dayAppointments);
 
   const items = dayAppointments
     .map((appt) => {
@@ -512,13 +673,15 @@ export function assignDayEventColumns(
 
     for (const { item, col } of assigned) {
       const base = computeCalendarEventLayout(item.appt, startHour, endHour);
+      const distinctTheme =
+        dayColorMap.get(item.appt.id || getAppointmentThemeSeed(item.appt)) || base.theme;
       results.push({
         appointment: item.appt,
         topPct: base.topPct,
         heightPct: base.heightPct,
         leftPct: col * widthPct,
         widthPct,
-        theme: base.theme,
+        theme: distinctTheme,
       });
     }
   }

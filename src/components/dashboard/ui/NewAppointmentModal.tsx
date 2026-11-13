@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, Phone, Scissors, AlertCircle, Check, RefreshCw } from 'lucide-react';
+import {
+  X,
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  Scissors,
+  AlertCircle,
+  Check,
+  RefreshCw,
+  Sparkles,
+  FileText,
+} from 'lucide-react';
 import { useBusiness } from '../../../context/BusinessContext';
 import { getSupabase } from '../../../lib/supabase';
 import { calculateEndTime, formatGHS, isValidGhanaPhone } from '../../../utils/booking-logic';
+import {
+  formatTimeRange12h,
+  getCalendarThemeBySeed,
+} from '../../../utils/dashboard-analytics';
 import { PRIMARY_ORANGE_BTN } from './DashboardTokens';
 
 interface Props {
@@ -168,16 +184,25 @@ export const NewAppointmentModal: React.FC<Props> = ({
     }
   };
 
+  const previewEndTime = selectedService
+    ? calculateEndTime(time || '09:00', selectedService.duration_minutes || 30)
+    : calculateEndTime(time || '09:00', 30);
+  const previewTheme = getCalendarThemeBySeed(
+    `${customerName || 'customer'}:${customerPhone || ''}:${serviceId || 'svc'}:${time}`
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden text-left my-8">
-        <div className="bg-gradient-to-r from-[#FF6B1A] to-[#EA580C] px-6 py-4 flex items-center justify-between text-white">
-          <div className="flex items-center gap-2.5">
-            <Calendar className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200/90 overflow-hidden text-left my-8">
+        <div className="bg-gradient-to-r from-[#FF6B1A] via-[#F95700] to-[#EA580C] px-6 py-4 flex items-center justify-between text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
             <div>
-              <h3 className="text-sm font-extrabold">New Appointment</h3>
+              <h3 className="text-sm font-extrabold tracking-tight">Schedule New Appointment</h3>
               <p className="text-[11px] text-orange-100">
-                Schedule a walk-in or phone booking for {currentBusiness?.name}
+                Organized walk-in or phone booking for {currentBusiness?.name}
               </p>
             </div>
           </div>
@@ -185,13 +210,13 @@ export const NewAppointmentModal: React.FC<Props> = ({
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition"
+            className="p-1.5 rounded-lg text-white/85 hover:text-white hover:bg-white/15 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
           {errorMsg && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -199,15 +224,64 @@ export const NewAppointmentModal: React.FC<Props> = ({
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Service</label>
+          {/* Live Colorful Calendar Card Preview */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span className="inline-flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#F95700]" />
+                Calendar Card Preview
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${previewTheme.dot}`} />
+                {previewTheme.name}
+              </span>
+            </div>
+            <div
+              className={`rounded-xl border border-l-4 px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-2xs ${previewTheme.bg} ${previewTheme.border} ${previewTheme.borderAll}`}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${previewTheme.dot}`} />
+                  <p className={`text-xs font-extrabold truncate ${previewTheme.titleText}`}>
+                    {customerName.trim() || 'Customer Name'}
+                  </p>
+                </div>
+                <p className={`text-[11px] font-semibold truncate mt-0.5 ${previewTheme.subText}`}>
+                  {selectedService?.name || 'Select a service'} &bull;{' '}
+                  <span className="tabular-nums">{formatTimeRange12h(time, previewEndTime)}</span>
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className={`text-xs font-extrabold tabular-nums ${previewTheme.titleText}`}>
+                  {selectedService ? formatGHS(selectedService.price) : 'GH₵0.00'}
+                </p>
+                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-bold capitalize border ${previewTheme.pill}`}>
+                  {status}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 1: Service Selection */}
+          <div className="rounded-xl border border-slate-200/80 p-4 space-y-3 bg-white">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#F95700]">
+                1. Service Details
+              </span>
+              {selectedService && (
+                <span className="text-[11px] font-bold text-slate-500 tabular-nums">
+                  {selectedService.duration_minutes} mins &bull; {formatGHS(selectedService.price)}
+                </span>
+              )}
+            </div>
             <div className="relative">
               <Scissors className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <select
                 value={serviceId}
                 onChange={(e) => setServiceId(e.target.value)}
                 required
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                aria-label="Service"
+                className="w-full pl-9 pr-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
               >
                 {services.length === 0 ? (
                   <option value="">No services created yet</option>
@@ -222,105 +296,123 @@ export const NewAppointmentModal: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Name</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Kwame Mensah"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-                />
+          {/* Section 2: Customer Information */}
+          <div className="rounded-xl border border-slate-200/80 p-4 space-y-3 bg-white">
+            <span className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#F95700]">
+              2. Customer Information
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Name *</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Kwame Mensah"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="tel"
-                  required
-                  placeholder="024XXXXXXX"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-                />
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number *</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="tel"
+                    required
+                    placeholder="024XXXXXXX"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          {/* Section 3: Schedule, Status & Notes */}
+          <div className="rounded-xl border border-slate-200/80 p-4 space-y-3.5 bg-white">
+            <span className="block text-[10.5px] font-extrabold uppercase tracking-wider text-[#F95700]">
+              3. Schedule & Status
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Appointment Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">Start Time *</label>
+                  <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
+                    Ends {previewEndTime}
+                  </span>
+                </div>
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="time"
+                    required
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Booking Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'confirmed' | 'pending')}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                >
+                  <option value="confirmed">Confirmed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Status</label>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value as 'paid' | 'pending')}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Date</label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-slate-400" />
+                <span>Customer Note (Optional)</span>
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Special preferences or arrival note..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
               />
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Start Time</label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="time"
-                  required
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-                />
-              </div>
-            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Booking Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as 'confirmed' | 'pending')}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-              >
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Status</label>
-              <select
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value as 'paid' | 'pending')}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-              >
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Customer Note (Optional)
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Special preferences or arrival note..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#F95700]"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
@@ -351,3 +443,4 @@ export const NewAppointmentModal: React.FC<Props> = ({
     </div>
   );
 };
+

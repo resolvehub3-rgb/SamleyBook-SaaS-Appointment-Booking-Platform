@@ -1,3 +1,8 @@
+import {
+  CALENDAR_EVENT_THEMES,
+  hashCalendarSeed,
+} from '../../utils/dashboard-analytics';
+
 export type AdminSectionId =
   | 'dashboard'
   | 'businesses'
@@ -88,22 +93,38 @@ export const REGISTRATION_STATUS_BADGES: Record<string, string> = {
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
-export const BUSINESS_COLOR_PALETTE = [
-  { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-950', pill: 'bg-orange-100 text-orange-800' },
-  { bg: 'bg-blue-50', border: 'border-l-blue-600', text: 'text-blue-950', pill: 'bg-blue-100 text-blue-800' },
-  { bg: 'bg-emerald-50', border: 'border-l-emerald-600', text: 'text-emerald-950', pill: 'bg-emerald-100 text-emerald-800' },
-  { bg: 'bg-violet-50', border: 'border-l-violet-600', text: 'text-violet-950', pill: 'bg-violet-100 text-violet-800' },
-  { bg: 'bg-amber-50', border: 'border-l-amber-600', text: 'text-amber-950', pill: 'bg-amber-100 text-amber-800' },
-  { bg: 'bg-cyan-50', border: 'border-l-cyan-600', text: 'text-cyan-950', pill: 'bg-cyan-100 text-cyan-800' },
-];
 
-export function getBusinessColor(businessId: string) {
-  let hash = 0;
-  for (let i = 0; i < businessId.length; i++) {
-    hash = (hash * 31 + businessId.charCodeAt(i)) >>> 0;
-  }
+export interface AdminCalendarColorTheme {
+  name: string;
+  bg: string;
+  border: string;
+  borderAll: string;
+  text: string;
+  subText: string;
+  pill: string;
+  dot: string;
+  accentHex: string;
+}
+
+export const BUSINESS_COLOR_PALETTE: AdminCalendarColorTheme[] = CALENDAR_EVENT_THEMES.map(
+  (t) => ({
+    name: t.name,
+    bg: t.bg,
+    border: t.border,
+    borderAll: t.borderAll,
+    text: t.titleText,
+    subText: t.subText,
+    pill: t.pill,
+    dot: t.dot,
+    accentHex: t.accentHex,
+  })
+);
+
+export function getBusinessColor(businessId: string): AdminCalendarColorTheme {
+  const hash = hashCalendarSeed(businessId || 'business');
   return BUSINESS_COLOR_PALETTE[hash % BUSINESS_COLOR_PALETTE.length];
 }
+
 
 export function formatCurrencyGhs(amount: number): string {
   return `GH₵${Number(amount || 0).toLocaleString('en-US', {

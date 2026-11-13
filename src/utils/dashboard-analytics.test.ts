@@ -9,6 +9,8 @@ import {
   formatTime12h,
   computeCalendarEventLayout,
   assignDayEventColumns,
+  buildDayColorMap,
+  CALENDAR_EVENT_THEMES,
   getMonthCalendarGrid,
 } from './dashboard-analytics';
 import { Appointment, Service } from '../types/database';
@@ -189,3 +191,30 @@ test('getMonthCalendarGrid: builds complete Sun-Sat calendar grid with adjacent 
   assert.equal(lastCell.dateStr, '2026-12-05');
   assert.equal(lastCell.isCurrentMonth, false);
 });
+
+test('CALENDAR_EVENT_THEMES & buildDayColorMap: assigns distinct non-colliding colors for multiple customer bookings on the same day', () => {
+  assert.equal(CALENDAR_EVENT_THEMES.length, 12);
+  const uniqueNames = new Set(CALENDAR_EVENT_THEMES.map((t) => t.name));
+  assert.equal(uniqueNames.size, 12);
+
+  // Even when 6 customers book the exact same service on the same day, every booking gets a distinct color theme
+  const sameDaySameService: Appointment[] = Array.from({ length: 6 }, (_, i) =>
+    makeAppt({
+      id: `booking-${i + 1}`,
+      service_id: 'svc-shared',
+      customer_name: `Customer ${i + 1}`,
+      appointment_time: `${String(9 + i).padStart(2, '0')}:00`,
+      end_time: `${String(10 + i).padStart(2, '0')}:00`,
+    })
+  );
+
+  const colorMap = buildDayColorMap(sameDaySameService);
+  assert.equal(colorMap.size, 6);
+  const assignedColorNames = new Set(Array.from(colorMap.values()).map((t) => t.name));
+  assert.equal(assignedColorNames.size, 6);
+
+  const positioned = assignDayEventColumns(sameDaySameService, 8, 18);
+  const positionedColorNames = new Set(positioned.map((p) => p.theme.name));
+  assert.equal(positionedColorNames.size, 6);
+});
+

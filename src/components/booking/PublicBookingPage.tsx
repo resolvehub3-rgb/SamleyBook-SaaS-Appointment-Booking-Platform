@@ -33,6 +33,7 @@ import {
   isValidGhanaPhone,
   BookedSlot,
 } from '../../utils/booking-logic';
+import { getCalendarThemeBySeed } from '../../utils/dashboard-analytics';
 import { SamleyLogo } from '../common/SamleyLogo';
 
 interface Props {
@@ -433,6 +434,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {services.map((svc) => {
                   const isSelected = selectedService?.id === svc.id;
+                  const svcTheme = getCalendarThemeBySeed(svc.id || svc.name);
                   return (
                     <article
                       key={svc.id}
@@ -443,7 +445,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                           : 'border-zinc-200/80 hover:border-orange-200 hover:shadow-xl hover:-translate-y-1'
                       }`}
                     >
-                      {/* Image / gradient header */}
+                      {/* Image / distinct gradient header */}
                       <div className="relative h-44 overflow-hidden">
                         {svc.image_url ? (
                           <img
@@ -452,8 +454,10 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-orange-500 via-orange-600 to-amber-500 flex items-center justify-center">
-                            <Scissors className="w-12 h-12 text-white/80" />
+                          <div
+                            className={`w-full h-full bg-gradient-to-br ${svcTheme.gradientHeader} flex items-center justify-center`}
+                          >
+                            <Scissors className="w-12 h-12 text-white/85" />
                           </div>
                         )}
 
@@ -621,8 +625,8 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
 
             <form onSubmit={handleConfirmBooking} className="space-y-5">
               {/* Customer Personal Details */}
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <div className="p-5 rounded-2xl border border-zinc-200/80 bg-zinc-50/40 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-orange-600">
                   1. Contact Information (For SMS Confirmation)
                 </h3>
 
@@ -636,7 +640,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                     placeholder="e.g. Ama Konadu"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
 
@@ -654,7 +658,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                         setCustomerPhone(e.target.value);
                         if (!momoNumber) setMomoNumber(e.target.value);
                       }}
-                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                     />
                   </div>
 
@@ -667,7 +671,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                       placeholder="ama@example.com"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
                 </div>
@@ -681,7 +685,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                     placeholder="Any specific styling instructions or preferences..."
                     value={customerNotes}
                     onChange={(e) => setCustomerNotes(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
               </div>
@@ -698,11 +702,11 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                 <div className="text-xs text-orange-900 space-y-1">
                   <div className="flex justify-between">
                     <span>Service Price:</span>
-                    <span className="font-bold">{formatGHS(selectedService.price)}</span>
+                    <span className="font-bold tabular-nums">{formatGHS(selectedService.price)}</span>
                   </div>
                   <div className="flex justify-between text-sm font-black text-orange-700 pt-1 border-t border-orange-200/50">
                     <span>Amount Required Now via MoMo:</span>
-                    <span>{formatGHS(paymentRequired)}</span>
+                    <span className="tabular-nums">{formatGHS(paymentRequired)}</span>
                   </div>
                   {paymentConfig?.payment_type === 'deposit' && (
                     <p className="text-[11px] text-orange-800 pt-1">
@@ -713,8 +717,8 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
               </div>
 
               {/* Moolre Mobile Money Checkout */}
-              <div className="space-y-4 pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <div className="p-5 rounded-2xl border border-zinc-200/80 bg-zinc-50/40 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-orange-600">
                   2. Moolre Mobile Money Checkout
                 </h3>
 
@@ -744,7 +748,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
                       placeholder="024XXXXXXX"
                       value={momoNumber}
                       onChange={(e) => setMomoNumber(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                     />
                   </div>
                 </div>

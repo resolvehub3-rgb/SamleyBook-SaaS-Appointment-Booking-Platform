@@ -18,6 +18,7 @@ import {
   X,
   ExternalLink,
 } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   AdminAppointmentRecord,
   AdminBusinessRecord,
@@ -31,6 +32,9 @@ import {
 import {
   addDays,
   assignDayEventColumns,
+  buildDayColorMap,
+  CALENDAR_EVENT_THEMES,
+  computeCalendarEventLayout,
   formatShortDateRange,
   formatTime12h,
   formatTimeRange12h,
@@ -79,8 +83,8 @@ const DEFAULT_FILTERS: AppointmentAdminFilters = {
   dateTo: '',
 };
 
-const HOURS = Array.from({ length: 13 }, (_, idx) => 7 + idx); // 7 AM - 7 PM
-const ROW_HEIGHT_PX = 60;
+const DEFAULT_HOURS = Array.from({ length: 13 }, (_, idx) => 7 + idx); // 7 AM - 7 PM
+const ROW_HEIGHT_PX = 68;
 
 export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
   appointments,
@@ -93,6 +97,7 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
   onViewBusiness,
   initialSearch = '',
 }) => {
+  const shouldReduceMotion = useReducedMotion();
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [calendarScale, setCalendarScale] = useState<'month' | 'week' | 'day'>('week');
   const [anchorDate, setAnchorDate] = useState<Date>(() => new Date());
@@ -442,45 +447,78 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
   };
 
   const renderWeekOrDayGrid = (
-    daysList: { dateStr: string; dayShort: string; dateLabel: string; isToday: boolean }[]
+    daysList: { dateStr: string; dayShort: string; dateLabel: string; isToday: boolean }[],
+    isDayScale: boolean = false
   ) => {
-    const startHour = HOURS[0];
-    const endHour = HOURS[HOURS.length - 1] + 1;
-    const gridTotalHeightPx = HOURS.length * ROW_HEIGHT_PX;
+    const startHour = DEFAULT_HOURS[0];
+    const endHour = DEFAULT_HOURS[DEFAULT_HOURS.length - 1] + 1;
+    const gridTotalHeightPx = DEFAULT_HOURS.length * ROW_HEIGHT_PX;
+
+    const now = new Date();
+    const curMin = now.getHours() * 60 + now.getMinutes();
+    const minGridMin = startHour * 60;
+    const maxGridMin = endHour * 60;
+    const nowPct =
+      curMin >= minGridMin && curMin <= maxGridMin
+        ? ((curMin - minGridMin) / Math.max(maxGridMin - minGridMin, 60)) * 100
+        : null;
+    const nowLabel = formatTime12h(
+      `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    );
 
     return (
       <div className="overflow-x-auto">
-        <div className="min-w-[680px]">
+        <div className={isDayScale ? 'min-w-[460px]' : 'min-w-[740px]'}>
           {/* Header Row */}
           <div
-            className="grid border-b border-slate-200 bg-[#F5F6F8]"
+            className="grid border-b border-slate-200/80 bg-gradient-to-r from-[#F5F6F8] via-white to-orange-50/35"
             style={{ gridTemplateColumns: `72px repeat(${daysList.length}, minmax(0, 1fr))` }}
           >
-            <div className="p-3 text-[10px] font-bold uppercase text-slate-400">Time</div>
+            <div className="p-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-end justify-end">
+              GMT
+            </div>
             {daysList.map((day) => {
-              const count = (appointmentsByDay.get(day.dateStr) || []).length;
+              const dayList = appointmentsByDay.get(day.dateStr) || [];
+              const activeCount = dayList.filter((a) => a.status !== 'cancelled').length;
+              const dateNum = day.dateLabel.replace(/^\D+\s*/, '');
               return (
                 <div
                   key={day.dateStr}
-                  className={`p-3 text-center border-l border-slate-200 ${
-                    day.isToday ? 'bg-[#E87936]/10' : ''
+                  className={`py-2.5 px-2 text-center border-l border-slate-200/70 flex flex-col items-center gap-1 ${
+                    day.isToday ? 'bg-[#FFF5EE]' : ''
                   }`}
                 >
-                  <p className="text-[10px] font-bold uppercase text-slate-500">{day.dayShort}</p>
-                  <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                  <p
+                    className={`text-[10.5px] font-extrabold uppercase tracking-wider ${
+                      day.isToday ? 'text-[#E87936]' : 'text-slate-400'
+                    }`}
+                  >
+                    {day.dayShort}
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5">
                     <span
-                      className={`text-xs font-extrabold tabular-nums ${
-                        day.isToday ? 'text-[#E87936]' : 'text-[#14243B]'
+                      className={`w-7 h-7 rounded-full text-xs font-extrabold tabular-nums inline-flex items-center justify-center ${
+                        day.isToday
+                          ? 'bg-[#E87936] text-white shadow-[0_2px_8px_rgba(232,121,54,0.35)]'
+                          : 'text-[#14243B]'
                       }`}
                     >
-                      {day.dateLabel}
+                      {dateNum || day.dateLabel}
                     </span>
-                    {count > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-[#14243B] text-white text-[10px] font-bold tabular-nums">
-                        {count}
-                      </span>
-                    )}
                   </div>
+                  <span
+                    className={`text-[10px] font-bold tabular-nums px-2 py-0.2 rounded-full ${
+                      activeCount > 0
+                        ? day.isToday
+                          ? 'bg-orange-100 text-[#C2410C]'
+                          : 'bg-slate-100 text-[#14243B]'
+                        : 'text-slate-300'
+                    }`}
+                  >
+                    {activeCount > 0
+                      ? `${activeCount} ${activeCount === 1 ? 'booking' : 'bookings'}`
+                      : 'Open'}
+                  </span>
                 </div>
               );
             })}
@@ -492,16 +530,25 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
             style={{ gridTemplateColumns: `72px repeat(${daysList.length}, minmax(0, 1fr))` }}
           >
             {/* Hour labels */}
-            <div className="divide-y divide-slate-100">
-              {HOURS.map((hr) => (
+            <div className="relative divide-y divide-slate-100 bg-white">
+              {DEFAULT_HOURS.map((hr) => (
                 <div
                   key={hr}
                   style={{ height: `${ROW_HEIGHT_PX}px` }}
-                  className="pr-2 pt-1 text-right text-[10px] font-semibold text-slate-400 tabular-nums"
+                  className="pr-2.5 pt-1 text-right text-[10px] font-semibold text-slate-400 tabular-nums"
                 >
                   {formatTime12h(`${String(hr).padStart(2, '0')}:00`)}
                 </div>
               ))}
+              {nowPct !== null && (
+                <div
+                  aria-hidden="true"
+                  style={{ top: `${nowPct}%` }}
+                  className="pointer-events-none absolute right-1 -translate-y-1/2 z-30 px-1.5 py-0.5 rounded-md bg-[#E87936] text-white text-[9px] font-extrabold tabular-nums shadow-xs whitespace-nowrap"
+                >
+                  {nowLabel}
+                </div>
+              )}
             </div>
 
             {/* Day Columns */}
@@ -517,48 +564,108 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
                 <div
                   key={day.dateStr}
                   style={{ height: `${gridTotalHeightPx}px` }}
-                  className={`relative border-l border-slate-200 ${
-                    day.isToday ? 'bg-orange-50/20' : 'bg-white'
+                  className={`relative border-l border-slate-200/75 ${
+                    day.isToday ? 'bg-[#FFF9F5]/65' : 'bg-white'
                   }`}
                 >
-                  {HOURS.map((hr) => (
+                  {DEFAULT_HOURS.map((hr) => (
                     <div
                       key={hr}
                       style={{ height: `${ROW_HEIGHT_PX}px` }}
-                      className="border-b border-slate-100"
-                    />
+                      className="relative border-b border-slate-200/70"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100"
+                      />
+                    </div>
                   ))}
+
+                  {/* Live Current-Time Line */}
+                  {day.isToday && nowPct !== null && (
+                    <div
+                      aria-hidden="true"
+                      style={{ top: `${nowPct}%` }}
+                      className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
+                    >
+                      <span className="w-2.5 h-2.5 -ml-1.5 rounded-full bg-[#E87936] ring-2 ring-white shadow-xs" />
+                      <span className="flex-1 h-[2px] bg-[#E87936]" />
+                    </div>
+                  )}
 
                   {placed.map((ev) => {
                     const appt = ev.appointment as unknown as AdminAppointmentRecord;
+                    const theme = ev.theme;
                     const bizColor = getBusinessColor(appt.business_id);
                     const isSelected = appt.id === selectedAppointmentId;
+                    const statusBadgeCls =
+                      appt.status === 'completed'
+                        ? 'bg-emerald-600 text-white'
+                        : appt.status === 'confirmed'
+                        ? 'bg-blue-600 text-white'
+                        : appt.status === 'pending'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-rose-600 text-white';
 
                     return (
-                      <button
+                      <motion.button
                         key={appt.id}
                         type="button"
+                        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.16 }}
                         onClick={() => onSelectAppointmentId(appt.id)}
+                        title={`${appt.business?.name || 'Business'} • ${appt.customer_name} • ${
+                          appt.service?.name || 'Service'
+                        } (${formatTimeRange12h(appt.appointment_time, appt.end_time)})`}
                         style={{
                           top: `calc(${ev.topPct}% + 2px)`,
                           height: `calc(${ev.heightPct}% - 4px)`,
-                          minHeight: '34px',
-                          left: `calc(${ev.leftPct}% + 3px)`,
-                          width: `calc(${ev.widthPct}% - 6px)`,
+                          minHeight: isDayScale ? '62px' : '54px',
+                          left: `calc(${ev.leftPct}% + ${isDayScale ? '8px' : '3px'})`,
+                          width: `calc(${ev.widthPct}% - ${isDayScale ? '16px' : '6px'})`,
                         }}
-                        className={`absolute rounded-lg border-l-4 px-2 py-1 text-left overflow-hidden shadow-xs transition ${
-                          bizColor.bg
-                        } ${bizColor.border} ${bizColor.text} ${
-                          isSelected ? 'ring-2 ring-[#E87936] z-20' : 'hover:shadow-md z-10'
-                        }`}
+                        className={`absolute rounded-xl border ${theme.borderAll} border-l-4 px-2.5 py-1.5 text-left overflow-hidden shadow-[0_2px_8px_rgba(15,23,42,0.08)] hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col justify-between ${
+                          theme.bg
+                        } ${theme.border} ${
+                          isSelected ? 'ring-2 ring-[#E87936] ring-offset-1 z-20' : 'z-10'
+                        } ${appt.status === 'cancelled' ? 'opacity-60' : ''}`}
                       >
-                        <p className="text-[10px] font-extrabold truncate leading-tight">
-                          {appt.business?.name || 'Business'}
-                        </p>
-                        <p className="text-[10px] font-semibold truncate leading-tight">
-                          {appt.customer_name} · {appt.service?.name || 'Service'}
-                        </p>
-                      </button>
+                        <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="inline-flex items-center gap-1 max-w-[75%] truncate px-1.5 py-0.2 rounded-md bg-white/85 border border-black/[0.06] text-[9.5px] font-extrabold text-[#14243B]">
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${bizColor.dot}`} />
+                              <span className="truncate">{appt.business?.name || 'Business'}</span>
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded-full text-[8.5px] font-extrabold capitalize shrink-0 ${statusBadgeCls}`}
+                            >
+                              {appt.status}
+                            </span>
+                          </div>
+                          <p
+                            className={`text-[11px] font-extrabold truncate leading-tight mt-0.5 ${theme.titleText} ${
+                              appt.status === 'cancelled' ? 'line-through' : ''
+                            }`}
+                          >
+                            {appt.customer_name}
+                          </p>
+                          <p className={`text-[10px] font-semibold truncate leading-tight ${theme.subText}`}>
+                            {appt.service?.name || 'Service'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1 pt-0.5 border-t border-black/[0.05]">
+                          <span className={`text-[9.5px] font-bold tabular-nums truncate ${theme.subText}`}>
+                            {isDayScale
+                              ? formatTimeRange12h(appt.appointment_time, appt.end_time)
+                              : formatTime12h(appt.appointment_time)}
+                          </span>
+                          <span className={`text-[9.5px] font-extrabold tabular-nums shrink-0 ${theme.titleText}`}>
+                            {formatCurrencyGhs(appt.service_price)}
+                          </span>
+                        </div>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -851,12 +958,12 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
           ) : (
             <div className={`${ADMIN_CARD} overflow-hidden`}>
               {/* Calendar Controls */}
-              <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-white">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => navigateCalendar(-1)}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-[#14243B]"
+                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-[#14243B] transition"
                     aria-label="Previous period"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -864,19 +971,19 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setAnchorDate(new Date())}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-[#E87936] hover:bg-orange-50"
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-[#E87936] hover:bg-orange-50 transition"
                   >
                     Today
                   </button>
                   <button
                     type="button"
                     onClick={() => navigateCalendar(1)}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-[#14243B]"
+                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-[#14243B] transition"
                     aria-label="Next period"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
-                  <h3 className="text-sm font-bold text-[#14243B] ml-2">{calendarTitle}</h3>
+                  <h3 className="text-sm font-extrabold text-[#14243B] ml-2">{calendarTitle}</h3>
                 </div>
 
                 <div className="inline-flex p-0.5 rounded-xl bg-[#F5F6F8] border border-slate-200">
@@ -885,9 +992,9 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
                       key={scale}
                       type="button"
                       onClick={() => setCalendarScale(scale)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold capitalize transition ${
                         calendarScale === scale
-                          ? 'bg-[#E87936] text-white'
+                          ? 'bg-[#E87936] text-white shadow-xs'
                           : 'text-slate-600 hover:text-[#14243B]'
                       }`}
                     >
@@ -897,91 +1004,313 @@ export const AdminAppointmentsView: React.FC<AdminAppointmentsViewProps> = ({
                 </div>
               </div>
 
-              {/* Calendar Body */}
-              {calendarScale === 'week' && renderWeekOrDayGrid(weekDays)}
-              {calendarScale === 'day' &&
-                renderWeekOrDayGrid([
-                  {
-                    dateStr: anchorIso,
-                    dayShort: anchorDate.toLocaleDateString('en-US', { weekday: 'short' }),
-                    dateLabel: anchorDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                    isToday: anchorIso === toIsoDateStr(new Date()),
-                  },
-                ])}
-              {calendarScale === 'month' && (
-                <div className="grid grid-cols-7 border-t border-slate-100">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                    <div
-                      key={d}
-                      className="py-2 px-2 text-center text-[10px] font-bold uppercase text-slate-400 bg-[#F5F6F8] border-b border-r border-slate-100 last:border-r-0"
-                    >
-                      {d}
-                    </div>
-                  ))}
-                  {monthGrid.map((cell) => {
-                    const dayAppts = appointmentsByDay.get(cell.dateStr) || [];
+              {/* Interactive Status & Multi-Color Palette Legend */}
+              <div className="px-4 py-2.5 bg-gradient-to-r from-[#F5F6F8] via-white to-orange-50/40 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      { key: 'confirmed', label: 'Confirmed', dot: 'bg-blue-500', activeCls: 'bg-blue-50 border-blue-200 text-blue-700' },
+                      { key: 'pending', label: 'Pending', dot: 'bg-amber-500', activeCls: 'bg-amber-50 border-amber-200 text-amber-700' },
+                      { key: 'completed', label: 'Completed', dot: 'bg-emerald-500', activeCls: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+                      { key: 'cancelled', label: 'Cancelled', dot: 'bg-rose-500', activeCls: 'bg-rose-50 border-rose-200 text-rose-700' },
+                    ] as const
+                  ).map((st) => {
+                    const isActive = filters.status === st.key;
                     return (
-                      <div
-                        key={cell.dateStr}
-                        className={`min-h-[104px] p-1.5 border-b border-r border-slate-100 ${
-                          cell.isCurrentMonth ? 'bg-white' : 'bg-slate-50/70'
+                      <button
+                        key={st.key}
+                        type="button"
+                        onClick={() => {
+                          setFilters((f) => ({
+                            ...f,
+                            status: f.status === st.key ? 'all' : st.key,
+                          }));
+                          setPage(0);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-bold transition ${
+                          isActive
+                            ? `${st.activeCls} shadow-2xs`
+                            : 'bg-white border-slate-200/80 text-slate-600 hover:border-slate-300 hover:text-[#14243B]'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAnchorDate(parseIsoDateLocal(cell.dateStr));
-                              setCalendarScale('day');
-                            }}
-                            className={`w-6 h-6 rounded-full text-[11px] font-bold tabular-nums flex items-center justify-center ${
-                              cell.isToday
-                                ? 'bg-[#E87936] text-white'
-                                : cell.isCurrentMonth
-                                ? 'text-[#14243B] hover:bg-slate-100'
-                                : 'text-slate-400'
+                        <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+                        <span>{st.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-slate-200/80 text-[10px] font-bold text-slate-600">
+                  <span className="flex items-center -space-x-1">
+                    {CALENDAR_EVENT_THEMES.slice(0, 6).map((t) => (
+                      <span
+                        key={t.name}
+                        className={`w-2.5 h-2.5 rounded-full ring-1 ring-white ${t.dot}`}
+                      />
+                    ))}
+                  </span>
+                  <span>Multi-color customer bookings</span>
+                </div>
+              </div>
+
+              {/* Calendar Body */}
+              {calendarScale === 'week' && renderWeekOrDayGrid(weekDays, false)}
+              {calendarScale === 'day' &&
+                renderWeekOrDayGrid(
+                  [
+                    {
+                      dateStr: anchorIso,
+                      dayShort: anchorDate.toLocaleDateString('en-US', { weekday: 'short' }),
+                      dateLabel: anchorDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      }),
+                      isToday: anchorIso === toIsoDateStr(new Date()),
+                    },
+                  ],
+                  true
+                )}
+              {calendarScale === 'month' && (() => {
+                const selectedMonthAppts = (appointmentsByDay.get(anchorIso) || [])
+                  .slice()
+                  .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                const selectedMonthColorMap = buildDayColorMap(
+                  selectedMonthAppts as unknown as Appointment[]
+                );
+                const selectedMonthRevenue = selectedMonthAppts
+                  .filter((a) => a.status !== 'cancelled')
+                  .reduce((sum, a) => sum + Number(a.service_price || 0), 0);
+
+                return (
+                  <div className="p-4 sm:p-5 space-y-5">
+                    <div className="rounded-2xl border border-slate-200/85 overflow-hidden bg-white shadow-2xs">
+                      <div className="grid grid-cols-7 border-b border-slate-200/80 bg-gradient-to-r from-[#F5F6F8] via-white to-orange-50/40">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
+                          <div
+                            key={d}
+                            className={`py-2.5 px-2 text-center text-[11px] font-extrabold uppercase tracking-wider border-r border-slate-200/70 last:border-r-0 ${
+                              idx === 0 || idx === 6 ? 'text-[#E87936]' : 'text-slate-600'
                             }`}
                           >
-                            {cell.dayNumber}
-                          </button>
-                          {dayAppts.length > 0 && (
-                            <span className="text-[10px] font-bold text-slate-400 tabular-nums">
-                              {dayAppts.length}
-                            </span>
-                          )}
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-7">
+                        {monthGrid.map((cell) => {
+                          const dayAppts = (appointmentsByDay.get(cell.dateStr) || [])
+                            .slice()
+                            .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                          const dayColorMap = buildDayColorMap(
+                            dayAppts as unknown as Appointment[]
+                          );
+                          const isSelectedDay = anchorIso === cell.dateStr;
+
+                          return (
+                            <div
+                              key={cell.dateStr}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                setAnchorDate(parseIsoDateLocal(cell.dateStr));
+                                if (dayAppts.length > 0) onSelectAppointmentId(dayAppts[0].id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setAnchorDate(parseIsoDateLocal(cell.dateStr));
+                                }
+                              }}
+                              className={`min-h-[116px] p-2 border-b border-r border-slate-200/70 [&:nth-child(7n)]:border-r-0 text-left flex flex-col justify-between transition cursor-pointer ${
+                                isSelectedDay
+                                  ? 'bg-[#FFF5EE]'
+                                  : !cell.isCurrentMonth
+                                  ? 'bg-slate-50/70'
+                                  : cell.isWeekend
+                                  ? 'bg-slate-50/35 hover:bg-orange-50/30'
+                                  : 'bg-white hover:bg-orange-50/25'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span
+                                  className={`w-7 h-7 rounded-full text-xs font-extrabold tabular-nums flex items-center justify-center transition ${
+                                    cell.isToday
+                                      ? 'bg-[#E87936] text-white shadow-[0_2px_8px_rgba(232,121,54,0.35)]'
+                                      : isSelectedDay
+                                      ? 'bg-[#14243B] text-white'
+                                      : cell.isCurrentMonth
+                                      ? 'text-[#14243B]'
+                                      : 'text-slate-300'
+                                  }`}
+                                >
+                                  {cell.dayNumber}
+                                </span>
+                                {dayAppts.length > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] font-extrabold text-[#14243B] tabular-nums">
+                                    {dayAppts.length}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                {dayAppts.slice(0, 3).map((appt) => {
+                                  const theme =
+                                    dayColorMap.get(appt.id) ||
+                                    computeCalendarEventLayout(appt as unknown as Appointment, 7, 20)
+                                      .theme;
+                                  const dotColor =
+                                    appt.status === 'completed'
+                                      ? 'bg-emerald-500'
+                                      : appt.status === 'confirmed'
+                                      ? 'bg-blue-600'
+                                      : appt.status === 'pending'
+                                      ? 'bg-amber-500'
+                                      : 'bg-rose-500';
+                                  return (
+                                    <button
+                                      key={appt.id}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAnchorDate(parseIsoDateLocal(cell.dateStr));
+                                        onSelectAppointmentId(appt.id);
+                                      }}
+                                      className={`w-full text-left flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-bold truncate border ${theme.borderAll} border-l-[3px] ${theme.border} ${theme.bg} ${theme.titleText} ${
+                                        appt.id === selectedAppointmentId
+                                          ? 'ring-1 ring-[#E87936] shadow-xs'
+                                          : 'hover:brightness-97'
+                                      } ${appt.status === 'cancelled' ? 'opacity-60 line-through' : ''}`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                                      <span className="tabular-nums shrink-0 font-extrabold">
+                                        {formatTime12h(appt.appointment_time)
+                                          .replace(':00 ', '')
+                                          .replace(' ', '')}
+                                      </span>
+                                      <span className="truncate">{appt.customer_name}</span>
+                                    </button>
+                                  );
+                                })}
+                                {dayAppts.length > 3 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAnchorDate(parseIsoDateLocal(cell.dateStr));
+                                      setCalendarScale('day');
+                                    }}
+                                    className="w-full text-left px-1 text-[10px] font-extrabold text-[#E87936] hover:underline"
+                                  >
+                                    +{dayAppts.length - 3} more bookings
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Selected Day Organized Agenda */}
+                    <div className="pt-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-[#14243B]">
+                            {parseIsoDateLocal(anchorIso).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 tabular-nums">
+                            {selectedMonthAppts.length} booking
+                            {selectedMonthAppts.length === 1 ? '' : 's'}
+                            {selectedMonthRevenue > 0
+                              ? ` · ${formatCurrencyGhs(selectedMonthRevenue)} total value`
+                              : ''}
+                          </p>
                         </div>
-                        <div className="space-y-1">
-                          {dayAppts.slice(0, 3).map((appt) => {
+                        <button
+                          type="button"
+                          onClick={() => setCalendarScale('day')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF3EC] text-[#E87936] text-[11px] font-extrabold hover:bg-[#FFE4D1] transition"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Open Day Timeline</span>
+                        </button>
+                      </div>
+
+                      {selectedMonthAppts.length === 0 ? (
+                        <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-[#F5F6F8]/60 text-xs text-slate-500">
+                          No appointments scheduled across any business on this date.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {selectedMonthAppts.map((appt) => {
+                            const theme =
+                              selectedMonthColorMap.get(appt.id) ||
+                              computeCalendarEventLayout(appt as unknown as Appointment, 7, 20).theme;
                             const bizColor = getBusinessColor(appt.business_id);
+                            const statusPill =
+                              appt.status === 'confirmed'
+                                ? 'bg-blue-600 text-white'
+                                : appt.status === 'completed'
+                                ? 'bg-emerald-600 text-white'
+                                : appt.status === 'pending'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-rose-600 text-white';
+
                             return (
                               <button
                                 key={appt.id}
                                 type="button"
                                 onClick={() => onSelectAppointmentId(appt.id)}
-                                className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] font-semibold truncate border-l-2 ${bizColor.bg} ${bizColor.border} ${bizColor.text}`}
+                                className={`p-3.5 rounded-2xl border ${theme.borderAll} border-l-4 text-left transition-all shadow-2xs hover:shadow-md ${
+                                  theme.bg
+                                } ${theme.border} ${
+                                  appt.id === selectedAppointmentId
+                                    ? 'ring-2 ring-[#E87936] shadow-md'
+                                    : ''
+                                } ${appt.status === 'cancelled' ? 'opacity-65' : ''}`}
                               >
-                                {formatTime12h(appt.appointment_time)} {appt.customer_name}
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/85 border border-black/[0.06] text-[10px] font-extrabold text-[#14243B] truncate max-w-[65%]">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${bizColor.dot}`} />
+                                    <span className="truncate">
+                                      {appt.business?.name || 'Business'}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold capitalize shrink-0 ${statusPill}`}
+                                  >
+                                    {appt.status}
+                                  </span>
+                                </div>
+                                <p className={`text-sm font-extrabold truncate ${theme.titleText}`}>
+                                  {appt.customer_name}
+                                </p>
+                                <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-black/[0.06]">
+                                  <span className={`text-[11px] font-bold truncate ${theme.subText}`}>
+                                    {appt.service?.name || 'Service'} &bull;{' '}
+                                    <span className="tabular-nums">
+                                      {formatTimeRange12h(appt.appointment_time, appt.end_time)}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={`text-xs font-extrabold tabular-nums shrink-0 ${theme.titleText}`}
+                                  >
+                                    {formatCurrencyGhs(appt.service_price)}
+                                  </span>
+                                </div>
                               </button>
                             );
                           })}
-                          {dayAppts.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAnchorDate(parseIsoDateLocal(cell.dateStr));
-                                setCalendarScale('day');
-                              }}
-                              className="w-full text-left px-1 text-[10px] font-bold text-[#E87936] hover:underline"
-                            >
-                              +{dayAppts.length - 3} more
-                            </button>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

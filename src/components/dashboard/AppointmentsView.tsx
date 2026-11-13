@@ -32,6 +32,8 @@ import {
 } from '../../utils/booking-logic';
 import {
   addDays,
+  buildDayColorMap,
+  CALENDAR_EVENT_THEMES,
   computeAppointmentKpis,
   computeCalendarEventLayout,
   assignDayEventColumns,
@@ -992,15 +994,15 @@ export const AppointmentsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Subtle Interactive Status Legend Bar */}
-              <div className="px-4 sm:px-5 py-2 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              {/* Interactive Status & Multi-Color Booking Legend Bar */}
+              <div className="px-4 sm:px-5 py-2.5 bg-gradient-to-r from-slate-50 via-white to-orange-50/40 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2.5 text-[11px]">
                 <div className="flex flex-wrap items-center gap-3">
                   {(
                     [
-                      { key: 'confirmed', label: 'Confirmed', dot: 'bg-blue-500' },
-                      { key: 'pending', label: 'Pending', dot: 'bg-amber-500' },
-                      { key: 'completed', label: 'Completed', dot: 'bg-emerald-500' },
-                      { key: 'cancelled', label: 'Cancelled', dot: 'bg-rose-500' },
+                      { key: 'confirmed', label: 'Confirmed', dot: 'bg-blue-500', pill: 'bg-blue-50 border-blue-200 text-blue-700' },
+                      { key: 'pending', label: 'Pending', dot: 'bg-amber-500', pill: 'bg-amber-50 border-amber-200 text-amber-700' },
+                      { key: 'completed', label: 'Completed', dot: 'bg-emerald-500', pill: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+                      { key: 'cancelled', label: 'Cancelled', dot: 'bg-rose-500', pill: 'bg-rose-50 border-rose-200 text-rose-700' },
                     ] as const
                   ).map((st) => {
                     const active = filterStatus === st.key;
@@ -1011,10 +1013,10 @@ export const AppointmentsView: React.FC = () => {
                         onClick={() =>
                           setFilterStatus((prev) => (prev === st.key ? 'all' : st.key))
                         }
-                        className={`inline-flex items-center gap-1.5 font-semibold transition ${
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-bold transition ${
                           active
-                            ? 'text-[#111827] underline decoration-[#F95700] decoration-2 underline-offset-4'
-                            : 'text-slate-500 hover:text-[#111827]'
+                            ? `${st.pill} shadow-2xs`
+                            : 'bg-white border-slate-200/80 text-slate-600 hover:border-slate-300 hover:text-[#111827]'
                         }`}
                       >
                         <span className={`w-2 h-2 rounded-full ${st.dot}`} />
@@ -1023,9 +1025,22 @@ export const AppointmentsView: React.FC = () => {
                     );
                   })}
                 </div>
-                <span className="text-[10.5px] font-medium text-slate-400 hidden sm:inline">
-                  Click any empty slot to create a booking
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-slate-200/80 text-[10px] font-bold text-slate-600">
+                    <span className="flex items-center -space-x-1">
+                      {CALENDAR_EVENT_THEMES.slice(0, 6).map((t) => (
+                        <span
+                          key={t.name}
+                          className={`w-2.5 h-2.5 rounded-full ring-1 ring-white ${t.dot}`}
+                        />
+                      ))}
+                    </span>
+                    <span>Distinct per-booking colors</span>
+                  </div>
+                  <span className="text-[10.5px] font-medium text-slate-400 hidden sm:inline">
+                    Click any empty slot to create a booking
+                  </span>
+                </div>
               </div>
 
               {/* WEEK VIEW (Real Calendar Time-Grid) */}
@@ -1173,7 +1188,7 @@ export const AppointmentsView: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Positioned Appointment Cards (side-by-side on overlap) */}
+                            {/* Positioned Appointment Cards (side-by-side on overlap, distinct vibrant colors) */}
                             {positioned.map(
                               ({ appointment: appt, topPct, heightPct, leftPct, widthPct, theme }) => {
                                 const isSelected = selectedAppt?.id === appt.id;
@@ -1181,20 +1196,23 @@ export const AppointmentsView: React.FC = () => {
                                   appt.status === 'completed'
                                     ? 'bg-emerald-500'
                                     : appt.status === 'confirmed'
-                                    ? 'bg-blue-500'
+                                    ? 'bg-blue-600'
                                     : appt.status === 'pending'
                                     ? 'bg-amber-500'
                                     : 'bg-rose-500';
                                 return (
-                                  <button
+                                  <motion.button
                                     key={appt.id}
                                     type="button"
+                                    initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.16 }}
                                     title={`${appt.customer_name} • ${
                                       appt.service?.name || 'Service'
                                     } (${formatTimeRange12h(
                                       appt.appointment_time,
                                       appt.end_time
-                                    )})`}
+                                    )}) • ${formatGHS(appt.service_price)}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedAppt(appt);
@@ -1202,39 +1220,53 @@ export const AppointmentsView: React.FC = () => {
                                     style={{
                                       top: `calc(${topPct}% + 2px)`,
                                       height: `calc(${heightPct}% - 4px)`,
+                                      minHeight: '50px',
                                       left: `calc(${leftPct}% + 2px)`,
                                       width: `calc(${widthPct}% - 4px)`,
                                     }}
-                                    className={`absolute rounded-xl border border-black/[0.06] border-l-4 px-2 py-1.5 text-left overflow-hidden transition-all shadow-[0_1px_4px_rgba(15,23,42,0.06)] hover:shadow-md hover:-translate-y-0.5 z-10 ${
+                                    className={`absolute rounded-xl border ${theme.borderAll} border-l-4 px-2 py-1.5 text-left overflow-hidden transition-all shadow-[0_2px_8px_rgba(15,23,42,0.07)] hover:shadow-lg hover:-translate-y-0.5 z-10 flex flex-col justify-between ${
                                       theme.bg
                                     } ${theme.border} ${
                                       isSelected
-                                        ? 'ring-2 ring-[#F95700] ring-offset-1 shadow-md z-20'
+                                        ? 'ring-2 ring-[#F95700] ring-offset-1 shadow-lg z-20'
                                         : ''
-                                    } ${appt.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
+                                    } ${appt.status === 'cancelled' ? 'opacity-60' : ''}`}
                                   >
-                                    <div className="flex items-center justify-between gap-1">
-                                      <p
-                                        className={`text-[11px] font-extrabold leading-tight truncate ${theme.titleText}`}
-                                      >
-                                        {appt.customer_name}
-                                      </p>
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`}
-                                        title={appt.status}
-                                      />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center justify-between gap-1">
+                                        <p
+                                          className={`text-[11px] font-extrabold leading-tight truncate ${theme.titleText} ${
+                                            appt.status === 'cancelled' ? 'line-through' : ''
+                                          }`}
+                                        >
+                                          {appt.customer_name}
+                                        </p>
+                                        <span
+                                          className={`w-2 h-2 rounded-full shrink-0 ring-1 ring-white ${dotColor}`}
+                                          title={`Status: ${appt.status}`}
+                                        />
+                                      </div>
+                                      <div className="mt-0.5 flex items-center gap-1 min-w-0">
+                                        <span
+                                          className={`inline-block max-w-full truncate px-1.5 py-0.2 rounded-md border text-[9.5px] font-bold ${theme.pill}`}
+                                        >
+                                          {appt.service?.name || 'Service'}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <p
-                                      className={`text-[10px] font-semibold leading-tight truncate mt-0.5 ${theme.subText}`}
-                                    >
-                                      {appt.service?.name || 'Service'}
-                                    </p>
-                                    <p
-                                      className={`text-[9.5px] font-medium tabular-nums leading-tight truncate mt-0.5 ${theme.subText}`}
-                                    >
-                                      {formatTimeRange12h(appt.appointment_time, appt.end_time)}
-                                    </p>
-                                  </button>
+                                    <div className="flex items-center justify-between gap-1 mt-0.5 pt-0.5 border-t border-black/[0.05]">
+                                      <span
+                                        className={`text-[9.5px] font-bold tabular-nums leading-tight truncate ${theme.subText}`}
+                                      >
+                                        {formatTime12h(appt.appointment_time)}
+                                      </span>
+                                      <span
+                                        className={`text-[9.5px] font-extrabold tabular-nums shrink-0 ${theme.titleText}`}
+                                      >
+                                        {formatGHS(appt.service_price)}
+                                      </span>
+                                    </div>
+                                  </motion.button>
                                 );
                               }
                             )}
@@ -1259,16 +1291,18 @@ export const AppointmentsView: React.FC = () => {
                   .filter((a) => a.status !== 'cancelled')
                   .reduce((sum, a) => sum + Number(a.service_price || 0), 0);
 
+                const selectedDayColorMap = buildDayColorMap(selectedDayAppts);
+
                 return (
                   <div className="p-4 sm:p-5 space-y-5">
-                    <div className="rounded-2xl border border-slate-200/85 overflow-hidden bg-white">
+                    <div className="rounded-2xl border border-slate-200/85 overflow-hidden bg-white shadow-2xs">
                       {/* Weekday Header Bar */}
-                      <div className="grid grid-cols-7 border-b border-slate-200/80 bg-slate-50/80">
+                      <div className="grid grid-cols-7 border-b border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-orange-50/40">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
                           <div
                             key={d}
                             className={`py-2.5 text-center text-[11px] font-extrabold uppercase tracking-wider border-r last:border-r-0 border-slate-200/70 ${
-                              idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-600'
+                              idx === 0 || idx === 6 ? 'text-orange-600/80' : 'text-slate-600'
                             }`}
                           >
                             {d}
@@ -1282,6 +1316,7 @@ export const AppointmentsView: React.FC = () => {
                           const dayAppts = filteredAppointments
                             .filter((a) => a.appointment_date === cell.dateStr)
                             .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                          const dayColorMap = buildDayColorMap(dayAppts);
                           const isSelected = selectedDate === cell.dateStr;
 
                           return (
@@ -1305,13 +1340,13 @@ export const AppointmentsView: React.FC = () => {
                                   }
                                 }
                               }}
-                              className={`group min-h-[114px] p-2 border-r border-b border-slate-200/70 [&:nth-child(7n)]:border-r-0 text-left flex flex-col justify-between transition cursor-pointer ${
+                              className={`group min-h-[120px] p-2 border-r border-b border-slate-200/70 [&:nth-child(7n)]:border-r-0 text-left flex flex-col justify-between transition cursor-pointer ${
                                 isSelected
                                   ? 'bg-[#FFF5EE]'
                                   : !cell.isCurrentMonth
                                   ? 'bg-slate-50/60'
                                   : cell.isWeekend
-                                  ? 'bg-slate-50/30 hover:bg-orange-50/30'
+                                  ? 'bg-slate-50/35 hover:bg-orange-50/30'
                                   : 'bg-white hover:bg-orange-50/25'
                               }`}
                             >
@@ -1332,7 +1367,7 @@ export const AppointmentsView: React.FC = () => {
 
                                 <div className="flex items-center gap-1">
                                   {dayAppts.length > 0 && (
-                                    <span className="text-[10px] font-bold tabular-nums text-slate-400">
+                                    <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] font-extrabold tabular-nums text-slate-700">
                                       {dayAppts.length}
                                     </span>
                                   )}
@@ -1353,12 +1388,13 @@ export const AppointmentsView: React.FC = () => {
 
                               <div className="space-y-1 mt-1.5 w-full">
                                 {dayAppts.slice(0, 3).map((a) => {
-                                  const { theme } = computeCalendarEventLayout(a, 8, 18);
+                                  const theme =
+                                    dayColorMap.get(a.id) || computeCalendarEventLayout(a, 8, 18).theme;
                                   const dotColor =
                                     a.status === 'completed'
                                       ? 'bg-emerald-500'
                                       : a.status === 'confirmed'
-                                      ? 'bg-blue-500'
+                                      ? 'bg-blue-600'
                                       : a.status === 'pending'
                                       ? 'bg-amber-500'
                                       : 'bg-rose-500';
@@ -1371,19 +1407,21 @@ export const AppointmentsView: React.FC = () => {
                                         setSelectedDate(cell.dateStr);
                                         setSelectedAppt(a);
                                       }}
-                                      className={`w-full text-left flex items-center gap-1 text-[10px] font-bold truncate px-1.5 py-0.5 rounded-md border border-black/[0.04] transition ${
+                                      className={`w-full text-left flex items-center justify-between gap-1 text-[10px] font-bold truncate px-1.5 py-1 rounded-md border ${theme.borderAll} border-l-[3px] ${theme.border} transition ${
                                         theme.bg
                                       } ${theme.titleText} ${
                                         selectedAppt?.id === a.id
-                                          ? 'ring-1 ring-[#F95700]'
-                                          : 'hover:brightness-95'
+                                          ? 'ring-1 ring-[#F95700] shadow-xs'
+                                          : 'hover:brightness-97'
                                       } ${a.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
                                     >
-                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-                                      <span className="tabular-nums shrink-0">
-                                        {a.appointment_time.slice(0, 5)}
+                                      <span className="flex items-center gap-1 min-w-0">
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                                        <span className="tabular-nums shrink-0 font-extrabold">
+                                          {formatTime12h(a.appointment_time).replace(':00 ', '').replace(' ', '')}
+                                        </span>
+                                        <span className="truncate">{a.customer_name}</span>
                                       </span>
-                                      <span className="truncate">{a.customer_name}</span>
                                     </button>
                                   );
                                 })}
@@ -1395,9 +1433,9 @@ export const AppointmentsView: React.FC = () => {
                                       setSelectedDate(cell.dateStr);
                                       setCalMode('day');
                                     }}
-                                    className="text-[10px] font-bold text-[#F95700] hover:underline px-1"
+                                    className="text-[10px] font-extrabold text-[#F95700] hover:underline px-1"
                                   >
-                                    +{dayAppts.length - 3} more
+                                    +{dayAppts.length - 3} more bookings
                                   </button>
                                 )}
                               </div>
@@ -1439,29 +1477,55 @@ export const AppointmentsView: React.FC = () => {
                           No appointments scheduled for this date. Click New Booking for Day to add one.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {selectedDayAppts.map((a) => {
-                            const { theme } = computeCalendarEventLayout(a, 8, 18);
+                            const theme =
+                              selectedDayColorMap.get(a.id) || computeCalendarEventLayout(a, 8, 18).theme;
+                            const statusPill =
+                              a.status === 'confirmed'
+                                ? 'bg-blue-600 text-white'
+                                : a.status === 'completed'
+                                ? 'bg-emerald-600 text-white'
+                                : a.status === 'pending'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-rose-600 text-white';
                             return (
                               <button
                                 key={a.id}
                                 type="button"
                                 onClick={() => setSelectedAppt(a)}
-                                className={`p-3 rounded-xl border border-black/[0.05] border-l-4 text-left transition ${
+                                className={`p-3.5 rounded-2xl border ${theme.borderAll} border-l-4 text-left transition-all shadow-2xs hover:shadow-md ${
                                   theme.bg
                                 } ${theme.border} ${
                                   selectedAppt?.id === a.id
-                                    ? 'ring-2 ring-[#F95700] shadow-xs'
-                                    : 'hover:shadow-xs'
-                                }`}
+                                    ? 'ring-2 ring-[#F95700] shadow-md'
+                                    : ''
+                                } ${a.status === 'cancelled' ? 'opacity-65' : ''}`}
                               >
-                                <p className={`text-xs font-extrabold tabular-nums ${theme.titleText}`}>
-                                  {formatTimeRange12h(a.appointment_time, a.end_time)} ·{' '}
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-extrabold tabular-nums ${theme.pill}`}
+                                  >
+                                    <Clock className="w-3 h-3" />
+                                    {formatTimeRange12h(a.appointment_time, a.end_time)}
+                                  </span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold capitalize ${statusPill}`}
+                                  >
+                                    {a.status}
+                                  </span>
+                                </div>
+                                <p className={`text-sm font-extrabold truncate ${theme.titleText}`}>
                                   {a.customer_name}
                                 </p>
-                                <p className={`text-[11px] font-semibold mt-0.5 ${theme.subText}`}>
-                                  {a.service?.name || 'Service'} · {formatGHS(a.service_price)}
-                                </p>
+                                <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-black/[0.06]">
+                                  <span className={`text-[11px] font-bold truncate ${theme.subText}`}>
+                                    {a.service?.name || 'Service'}
+                                  </span>
+                                  <span className={`text-xs font-extrabold tabular-nums shrink-0 ${theme.titleText}`}>
+                                    {formatGHS(a.service_price)}
+                                  </span>
+                                </div>
                               </button>
                             );
                           })}
@@ -1587,10 +1651,21 @@ export const AppointmentsView: React.FC = () => {
                         {positioned.map(
                           ({ appointment: appt, topPct, heightPct, leftPct, widthPct, theme }) => {
                             const isSelected = selectedAppt?.id === appt.id;
+                            const statusBadgeCls =
+                              appt.status === 'completed'
+                                ? 'bg-emerald-600 text-white'
+                                : appt.status === 'confirmed'
+                                ? 'bg-blue-600 text-white'
+                                : appt.status === 'pending'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-rose-600 text-white';
                             return (
-                              <button
+                              <motion.button
                                 key={appt.id}
                                 type="button"
+                                initial={shouldReduceMotion ? false : { opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.18 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedAppt(appt);
@@ -1598,33 +1673,52 @@ export const AppointmentsView: React.FC = () => {
                                 style={{
                                   top: `calc(${topPct}% + 2px)`,
                                   height: `calc(${heightPct}% - 4px)`,
+                                  minHeight: '62px',
                                   left: `calc(${leftPct}% + 8px)`,
                                   width: `calc(${widthPct}% - 16px)`,
                                 }}
-                                className={`absolute rounded-2xl border border-black/[0.06] border-l-4 px-3.5 py-2 text-left flex items-center justify-between gap-3 overflow-hidden transition-all shadow-[0_2px_8px_rgba(15,23,42,0.06)] hover:shadow-md z-10 ${
+                                className={`absolute rounded-2xl border ${theme.borderAll} border-l-4 px-4 py-2.5 text-left flex items-center justify-between gap-3 overflow-hidden transition-all shadow-[0_3px_10px_rgba(15,23,42,0.07)] hover:shadow-lg z-10 ${
                                   theme.bg
                                 } ${theme.border} ${
-                                  isSelected ? 'ring-2 ring-[#F95700] z-20' : ''
-                                } ${appt.status === 'cancelled' ? 'opacity-55 line-through' : ''}`}
+                                  isSelected ? 'ring-2 ring-[#F95700] ring-offset-1 z-20' : ''
+                                } ${appt.status === 'cancelled' ? 'opacity-60' : ''}`}
                               >
-                                <div className="min-w-0">
-                                  <p className={`text-xs font-extrabold truncate ${theme.titleText}`}>
-                                    {appt.customer_name}
-                                  </p>
-                                  <p className={`text-[11px] font-semibold truncate tabular-nums mt-0.5 ${theme.subText}`}>
-                                    {appt.service?.name || 'Service'} ·{' '}
-                                    {formatTimeRange12h(appt.appointment_time, appt.end_time)}
-                                  </p>
+                                <div className="min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${theme.dot}`} />
+                                    <p
+                                      className={`text-sm font-extrabold truncate ${theme.titleText} ${
+                                        appt.status === 'cancelled' ? 'line-through' : ''
+                                      }`}
+                                    >
+                                      {appt.customer_name}
+                                    </p>
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[9.5px] font-extrabold capitalize shrink-0 ${statusBadgeCls}`}
+                                    >
+                                      {appt.status}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                                    <span className={`px-2 py-0.5 rounded-md border ${theme.pill}`}>
+                                      {appt.service?.name || 'Service'}
+                                    </span>
+                                    <span className={`tabular-nums ${theme.subText}`}>
+                                      {formatTimeRange12h(appt.appointment_time, appt.end_time)}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <p className={`text-xs font-extrabold tabular-nums ${theme.titleText}`}>
+                                  <p className={`text-sm font-extrabold tabular-nums ${theme.titleText}`}>
                                     {formatGHS(appt.service_price)}
                                   </p>
-                                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-white/90 text-[10px] font-bold capitalize text-slate-700">
-                                    {appt.status}
+                                  <span
+                                    className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize border ${theme.pill}`}
+                                  >
+                                    {appt.payment_status.replace('_', ' ')}
                                   </span>
                                 </div>
-                              </button>
+                              </motion.button>
                             );
                           }
                         )}
