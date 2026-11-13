@@ -20,11 +20,24 @@ import { Appointment, AppointmentStatus } from '../../types/database';
 
 export const AppointmentsView: React.FC = () => {
   const { currentBusiness, appointments, refreshBusinessData } = useBusiness();
+
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [calMode, setCalMode] = useState<'month' | 'week' | 'day'>('month');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [calMonth, setCalMonth] = useState<Date>(new Date());
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [smsActionLoading, setSmsActionLoading] = useState(false);
   const [smsActionMsg, setSmsActionMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('samley_appt_view');
+    if (saved === 'list' || saved === 'calendar') setViewMode(saved);
+  }, []);
+  React.useEffect(() => {
+    localStorage.setItem('samley_appt_view', viewMode);
+  }, [viewMode]);
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
@@ -127,6 +140,22 @@ export const AppointmentsView: React.FC = () => {
           </p>
         </div>
 
+        {/* View switcher */}
+        <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-xl p-1">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-zinc-600 hover:bg-zinc-50'}`}
+          >
+            List View
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${viewMode === 'calendar' ? 'bg-orange-600 text-white' : 'text-zinc-600 hover:bg-zinc-50'}`}
+          >
+            Calendar View
+          </button>
+        </div>
+
         {/* Filter Badges */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
           {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((st) => (
@@ -157,6 +186,8 @@ export const AppointmentsView: React.FC = () => {
         />
       </div>
 
+      {viewMode === 'list' && (
+        <>
       {/* Appointments List */}
       {filteredAppointments.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-zinc-200/80 shadow-xs space-y-3">
@@ -272,6 +303,150 @@ export const AppointmentsView: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      </>
+      )}
+
+      {viewMode === 'calendar' && (
+        <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-6 space-y-4">
+          {/* Calendar mode switcher */}
+          <div className="flex items-center gap-2">
+            {(['month', 'week', 'day'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setCalMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition ${calMode === m ? 'bg-orange-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+              >
+                {m}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => {
+                const d = new Date(calMonth);
+                d.setMonth(d.getMonth() - 1);
+                setCalMonth(d);
+              }} className="px-2 py-1 rounded-lg border border-zinc-200 text-xs">Prev</button>
+              <button onClick={() => setCalMonth(new Date())} className="px-2 py-1 rounded-lg border border-zinc-200 text-xs">Today</button>
+              <button onClick={() => {
+                const d = new Date(calMonth);
+                d.setMonth(d.getMonth() + 1);
+                setCalMonth(d);
+              }} className="px-2 py-1 rounded-lg border border-zinc-200 text-xs">Next</button>
+            </div>
+          </div>
+
+          {calMode === 'month' && (
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 mb-3">
+                {calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h3>
+              <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-400 mb-2">
+                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => <div key={d}>{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {(() => {
+                  const year = calMonth.getFullYear();
+                  const month = calMonth.getMonth();
+                  const firstDay = new Date(year, month, 1).getDay();
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const cells = [];
+                  for (let i = 0; i < firstDay; i++) cells.push(null);
+                  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+                  return cells.map((day, idx) => {
+                    if (day === null) return <div key={idx} />;
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const count = appointments.filter((a) => a.appointment_date === dateStr).length;
+                    const isSelected = selectedDate === dateStr;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedDate(dateStr)}
+                        className={`aspect-square rounded-lg text-xs flex flex-col items-center justify-center border transition ${isSelected ? 'bg-orange-600 text-white border-orange-600' : count > 0 ? 'bg-orange-50 border-orange-200 text-zinc-900' : 'bg-white border-zinc-100 text-zinc-500'}`}
+                      >
+                        <span>{day}</span>
+                        {count > 0 && <span className="text-[9px] mt-0.5">{count}</span>}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+              <div className="mt-4">
+                <h4 className="text-xs font-bold text-zinc-700 mb-2">Appointments on {selectedDate}</h4>
+                {appointments.filter((a) => a.appointment_date === selectedDate).length === 0 ? (
+                  <p className="text-xs text-zinc-500">No appointments on this date.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {appointments
+                      .filter((a) => a.appointment_date === selectedDate)
+                      .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
+                      .map((a) => (
+                        <button
+                          key={a.id}
+                          onClick={() => setSelectedAppt(a)}
+                          className="w-full text-left p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition"
+                        >
+                          <p className="text-xs font-bold text-zinc-900">{a.appointment_time} - {a.end_time} • {a.customer_name}</p>
+                          <p className="text-[11px] text-zinc-500">{a.service?.name || 'Service'} • {formatGHS(a.service_price)}</p>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {calMode === 'week' && (
+            <div className="overflow-x-auto">
+              <p className="text-xs text-zinc-500 mb-3">Week view (simplified): appointments grouped by day.</p>
+              <div className="grid grid-cols-7 gap-2 min-w-[700px]">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date(selectedDate);
+                  const day = d.getDay();
+                  const start = new Date(d);
+                  start.setDate(d.getDate() - day + i);
+                  const ds = start.toISOString().split('T')[0];
+                  const dayAppts = appointments.filter((a) => a.appointment_date === ds).sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                  return (
+                    <div key={i} className="border border-zinc-200 rounded-xl p-2 min-h-[120px]">
+                      <p className="text-[10px] font-bold text-zinc-700 mb-1">{start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                      {dayAppts.map((a) => (
+                        <button key={a.id} onClick={() => setSelectedAppt(a)} className="block w-full text-left text-[10px] p-1 mb-1 rounded bg-orange-50 border border-orange-200 text-zinc-800">
+                          {a.appointment_time} {a.customer_name}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {calMode === 'day' && (
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900 mb-3">Schedule for {selectedDate}</h3>
+              {appointments.filter((a) => a.appointment_date === selectedDate).length === 0 ? (
+                <p className="text-xs text-zinc-500">No appointments on this date.</p>
+              ) : (
+                <div className="space-y-2">
+                  {appointments
+                    .filter((a) => a.appointment_date === selectedDate)
+                    .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
+                    .map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => setSelectedAppt(a)}
+                        className="w-full text-left p-3 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition"
+                      >
+                        <p className="text-xs font-bold text-zinc-900">{a.appointment_time} - {a.end_time} • {a.customer_name}</p>
+                        <p className="text-[11px] text-zinc-500">{a.service?.name || 'Service'} • {formatGHS(a.service_price)} • {a.status}</p>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
