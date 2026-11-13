@@ -96,18 +96,17 @@ export default async function handler(req: any, res: any) {
 
   // 3. Payment Verification (Moolre) Environment Readiness
   const moolreConfigured = !!(
-    process.env.MOOLRE_API_USER ||
-    process.env.MOOLRE_API_PUBKEY ||
-    process.env.MOOLRE_ACCOUNT_NUMBER ||
-    process.env.VITE_MOOLRE_API_USER
+    process.env.MOOLRE_API_USER &&
+    process.env.MOOLRE_API_PUBKEY &&
+    process.env.MOOLRE_ACCOUNT_NUMBER
   );
   checks.push({
     key: 'payments',
     label: 'Moolre Payment Verification',
     status: moolreConfigured ? 'healthy' : 'unconfigured',
     detail: moolreConfigured
-      ? 'Payment gateway credentials present.'
-      : 'Payment gateway credentials are not configured on this server.',
+      ? 'Moolre server API user, public key, and account number are configured.'
+      : 'Moolre credentials (MOOLRE_API_USER, MOOLRE_API_PUBKEY, MOOLRE_ACCOUNT_NUMBER) are missing.',
     checkedAt,
   });
 

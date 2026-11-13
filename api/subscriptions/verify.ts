@@ -1,4 +1,14 @@
 import { getServiceSupabase } from '../_lib/supabase.js';
+import { verifyAndActivateSubscriptionPayment } from '../_lib/moolre.js';
+import { isServerSuperAdmin } from '../_lib/subscription.js';
+
+async function readJson(req: any): Promise<any> {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -9,7 +19,7 @@ export default async function handler(req: any, res: any) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'Unauthorized: missing access token' });
     return;
   }
 
@@ -17,85 +27,80 @@ export default async function handler(req: any, res: any) {
   const { data: userData } = await supabase.auth.getUser(token);
   const user = userData?.user;
   if (!user) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'Unauthorized: invalid session' });
     return;
   }
 
   let body: any = {};
   try {
-    if (req.body && typeof req.body === 'object') body = req.body;
-    else {
-      const chunks: Buffer[] = [];
-      for await (const chunk of req) chunks.push(Buffer.from(chunk));
-      const raw = Buffer.concat(chunks).toString('utf8');
-      body = raw ? JSON.parse(raw) : {};
-    }
+    body = await readJson(req);
   } catch {
-    res.status(400).json({ error: 'Invalid JSON' });
+    res.status(400).json({ error: 'Invalid JSON body' });
     return;
   }
 
   const { reference } = body;
-  if (!reference) {
-    res.status(400).json({ error: 'Missing reference' });
+  if (!reference || typeof reference !== 'string') {
+    res.status(400).json({ error: 'Missing payment reference' });
     return;
   }
 
   const { data: payment } = await supabase
     .from('payment_transactions')
-    .select('id, business_id, subscription_id, plan_id, amount, status, moolre_reference')
-    .eq('moolre_reference', reference)
+    .select(
+      'id, business_id, appointment_id, subscription_id, plan_id, amount, currency, status, moolre_reference'
+    )
+    .eq('moolre_reference', reference.trim())
+    .is('appointment_id', null)
     .maybeSingle();
 
   if (!payment) {
-    res.status(404).json({ error: 'Payment not found' });
+    res.status(404).json({ error: 'Subscription payment transaction not found' });
     return;
   }
 
-  // Verify ownership
+  // Verify ownership or Super Admin authorization
   const { data: business } = await supabase
     .from('businesses')
     .select('id, owner_id')
     .eq('id', payment.business_id)
-    .single();
-  if (!business || business.owner_id !== user.id) {
-    res.status(403).json({ error: 'Access denied' });
+    .maybeSingle();
+
+  const isAdmin = await isServerSuperAdmin(supabase, user.id, user.email);
+  if (!business || (!isAdmin && business.owner_id !== user.id)) {
+    res.status(403).json({ error: 'Forbidden: access denied for this business' });
     return;
   }
 
-  if (payment.status === 'successful') {
-    res.status(200).json({ ok: true, alreadyVerified: true });
+  const result = await verifyAndActivateSubscriptionPayment({
+    supabase,
+    payment,
+  });
+
+  if (result.status === 'pending') {
+    res.status(200).json({
+      ok: false,
+      status: 'pending',
+      message: result.message,
+    });
     return;
   }
 
-  // Mark payment successful (in real implementation, verify with Moolre here)
-  await supabase
-    .from('payment_transactions')
-    .update({ status: 'successful', raw_response: { verified_at: new Date().toISOString() } })
-    .eq('id', payment.id);
-
-  // Activate subscription
-  if (payment.subscription_id) {
-    const { data: plan } = await supabase
-      .from('subscription_plans')
-      .select('billing_cycle')
-      .eq('id', payment.plan_id)
-      .single();
-    const months = plan?.billing_cycle === 'yearly' ? 12 : 1;
-    const newEnd = new Date();
-    newEnd.setMonth(newEnd.getMonth() + months);
-
-    await supabase
-      .from('business_subscriptions')
-      .update({
-        status: 'active',
-        payment_status: 'paid',
-        current_period_start: new Date().toISOString(),
-        current_period_end: newEnd.toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', payment.subscription_id);
+  if (result.status === 'failed' || !result.ok) {
+    res.status(402).json({
+      ok: false,
+      status: 'failed',
+      error: result.message,
+    });
+    return;
   }
 
-  res.status(200).json({ ok: true, activated: true });
+  res.status(200).json({
+    ok: true,
+    status: 'successful',
+    alreadyVerified: Boolean(result.alreadyVerified),
+    activated: Boolean(result.activated),
+    subscription: result.subscription || null,
+    message: result.message,
+  });
 }

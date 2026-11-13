@@ -42,6 +42,8 @@ const handlerMap: Record<string, string> = {
   '/api/cron/expire-subscriptions': './api/cron/expire-subscriptions.ts',
   '/api/subscriptions/initiate': './api/subscriptions/initiate.ts',
   '/api/subscriptions/verify': './api/subscriptions/verify.ts',
+  '/api/subscriptions/status': './api/subscriptions/status.ts',
+  '/api/webhooks/moolre': './api/webhooks/moolre.ts',
 };
 
 for (const [route, modulePath] of Object.entries(handlerMap)) {

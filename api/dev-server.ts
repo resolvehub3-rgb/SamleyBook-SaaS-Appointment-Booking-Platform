@@ -12,9 +12,13 @@ const handlerMap: Record<string, string> = {
   '/api/sms/config': './sms/config.ts',
   '/api/feedback/validate': './feedback/validate.ts',
   '/api/feedback/submit': './feedback/submit.ts',
+  '/api/subscriptions/initiate': './subscriptions/initiate.ts',
   '/api/subscriptions/verify': './subscriptions/verify.ts',
+  '/api/subscriptions/status': './subscriptions/status.ts',
   '/api/cron/process-reminders': './cron/process-reminders.ts',
+  '/api/cron/expire-subscriptions': './cron/expire-subscriptions.ts',
   '/api/webhooks/sasu-sync': './webhooks/sasu-sync.ts',
+  '/api/webhooks/moolre': './webhooks/moolre.ts',
 };
 
 async function runHandler(req: any, res: any, modulePath: string) {

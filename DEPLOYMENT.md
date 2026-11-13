@@ -34,6 +34,11 @@ for **Production** (and Preview if you want). At minimum:
 - `SASUSYNC_SENDER_ID`
 - `SASUSYNC_BASE_URL`
 - `SASUSYNC_WEBHOOK_SECRET`
+- `MOOLRE_API_USER`
+- `MOOLRE_API_PUBKEY`
+- `MOOLRE_ACCOUNT_NUMBER`
+- `MOOLRE_BASE_URL` (default `https://api.moolre.com`)
+- `MOOLRE_WEBHOOK_SECRET` (optional webhook shared secret)
 - `CRON_SECRET` (recommended)
 
 After adding them, redeploy (Deployments → Redeploy).
@@ -47,7 +52,7 @@ Run the SQL files in your Supabase SQL Editor (in order):
 - `src/lib/sms-management-schema.sql`
 - files under `supabase/migrations/`
 
-## 5. Configure SasuSync webhook
+## 5. Configure SasuSync & Moolre webhooks
 
 Point your SasuSync webhook to:
 
@@ -57,11 +62,19 @@ https://your-app.vercel.app/api/webhooks/sasu-sync
 
 with the `X-Webhook-Signature` header signed using `SASUSYNC_WEBHOOK_SECRET`.
 
+Point your Moolre payment callback webhook to:
+
+```
+https://your-app.vercel.app/api/webhooks/moolre
+```
+
+All Moolre callbacks are verified directly against Moolre's transaction status API before updating subscription expiry timestamps.
+
 ## Hobby-plan notes
 
-- Cron jobs on the Hobby plan can run **at most once per day**. The reminder cron is
-  scheduled for `0 0 * * *` (daily). If you need hourly reminders, upgrade to Pro and
-  change the schedule in `vercel.json`.
+- Cron jobs on the Hobby plan can run **at most once per day**. The reminder cron runs
+  at `0 0 * * *` and subscription expiry sweep runs at `5 0 * * *` (daily UTC), alongside
+  real-time timestamp checks on login, reload, API requests, and Supabase RLS.
 - Serverless functions on Hobby have a **10 second** max duration. The reminder cron
   processes up to 10 reminders per run to stay within this limit.
 - Redeploy after any change to `vercel.json`.

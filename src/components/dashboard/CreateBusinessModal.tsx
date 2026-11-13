@@ -6,19 +6,20 @@ import {
   AlertCircle,
   RefreshCw,
   Crown,
-  CreditCard,
   CheckCircle2,
   ShieldCheck,
-  Loader2,
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
-import { getSupabase } from '../../lib/supabase';
 import {
   canRegisterAdditionalBusiness,
   generateBusinessSlug,
   isValidGhanaPhone,
-  resolvePremiumPlan,
 } from '../../utils/booking-logic';
+import {
+  SAMLEYBOOK_PLAN_NAME,
+  SAMLEYBOOK_PLAN_PRICE_GHS,
+} from '../../utils/subscription-access';
+import { MoolreRenewalCheckout } from './MoolreRenewalCheckout';
 import { PRIMARY_ORANGE_BTN } from './ui/DashboardTokens';
 
 interface Props {
@@ -31,6 +32,8 @@ export const CreateBusinessModal: React.FC<Props> = ({ isOpen, onClose }) => {
     businesses,
     currentBusiness,
     subscription,
+    subscriptionAccess,
+    paymentConfig,
     createBusiness,
     refreshBusinessData,
   } = useBusiness();
@@ -42,97 +45,22 @@ export const CreateBusinessModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [description, setDescription] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [paying, setPaying] = useState(false);
   const [justVerified, setJustVerified] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [planPrice, setPlanPrice] = useState<number>(120);
-  const [planCode, setPlanCode] = useState<string>('premium');
 
   useEffect(() => {
     if (!isOpen) {
       setErrorMsg(null);
-      setPaying(false);
       setJustVerified(false);
-      return;
     }
-
-    const fetchActivePlan = async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-      const { data } = await supabase
-        .from('subscription_plans')
-        .select('id, name, code, price_ghs')
-        .eq('is_active', true)
-        .order('price_ghs', { ascending: true });
-      const resolved = resolvePremiumPlan(data || [], subscription?.plan_id);
-      if (resolved) {
-        if (resolved.price_ghs) setPlanPrice(Number(resolved.price_ghs));
-        if (resolved.code) setPlanCode(resolved.code);
-      }
-    };
-    fetchActivePlan();
-  }, [isOpen, subscription?.plan_id]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isUnlocked =
-    justVerified || canRegisterAdditionalBusiness(businesses.length, subscription);
-
-  const handlePayNowUpgrade = async () => {
-    if (!currentBusiness) {
-      setErrorMsg('No active business found to associate payment with.');
-      return;
-    }
-
-    setPaying(true);
-    setErrorMsg(null);
-    try {
-      const supabase = getSupabase();
-      if (!supabase) throw new Error('Supabase is not configured.');
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('Session expired. Please sign in again.');
-
-      const initRes = await fetch('/api/subscriptions/initiate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          businessId: currentBusiness.id,
-          planCode,
-        }),
-      });
-      const initData = await initRes.json();
-      if (!initRes.ok) {
-        throw new Error(initData.error || 'Failed to initiate subscription payment.');
-      }
-
-      const verifyRes = await fetch('/api/subscriptions/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reference: initData.reference }),
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) {
-        throw new Error(verifyData.error || 'Payment verification failed.');
-      }
-
-      await refreshBusinessData();
-      setJustVerified(true);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Upgrade payment failed.');
-    } finally {
-      setPaying(false);
-    }
-  };
+    justVerified ||
+    (subscriptionAccess.isPaidActive &&
+      canRegisterAdditionalBusiness(businesses.length, subscription));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,7 +133,7 @@ export const CreateBusinessModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <p className="text-[11px] text-orange-100 leading-snug mt-0.5">
                 {isUnlocked
                   ? 'Manage multiple business locations or brands'
-                  : 'Activate Book Premium to unlock additional locations or brands'}
+                  : `Activate ${SAMLEYBOOK_PLAN_NAME} to unlock additional locations or brands`}
               </p>
             </div>
           </div>
@@ -228,23 +156,24 @@ export const CreateBusinessModal: React.FC<Props> = ({ isOpen, onClose }) => {
           )}
 
           {!isUnlocked ? (
-            /* UPGRADE GATE BEFORE REGISTERING ADDITIONAL BUSINESS */
+            /* REAL MOOLRE UPGRADE GATE BEFORE REGISTERING ADDITIONAL BUSINESS */
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#FFF6EE] to-[#FFE7D4] border border-[#FADAC1] space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="px-2.5 py-0.5 rounded-full bg-[#F95700] text-white text-[10px] font-extrabold uppercase tracking-wider">
-                    Book Premium
+                    {SAMLEYBOOK_PLAN_NAME}
                   </span>
                   <span className="text-sm font-black text-[#111827] tabular-nums">
-                    GHS {planPrice.toFixed(2)}{' '}
-                    <span className="text-[11px] font-semibold text-slate-500">/month</span>
+                    GH₵{SAMLEYBOOK_PLAN_PRICE_GHS}{' '}
+                    <span className="text-[11px] font-semibold text-slate-500">Every 30 days</span>
                   </span>
                 </div>
                 <p className="text-xs font-bold text-[#111827]">
-                  Upgrade required to manage multiple business locations or brands
+                  Paid subscription required to manage multiple business locations
                 </p>
                 <p className="text-[11.5px] text-slate-600 leading-relaxed">
-                  Complete your <strong className="text-[#111827]">Book Premium</strong> subscription payment to unlock multi-business registration and instant workspace switching.
+                  Complete your <strong className="text-[#111827]">{SAMLEYBOOK_PLAN_NAME}</strong>{' '}
+                  Moolre payment below to unlock multi-business registration immediately after verification.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-2 border-t border-orange-200/60">
@@ -268,40 +197,26 @@ export const CreateBusinessModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px] text-slate-600">
                 <ShieldCheck className="w-4 h-4 text-[#F95700] shrink-0 mt-0.5" />
                 <span>
-                  Once payment is verified, the <strong className="text-[#111827]">Register Another Business</strong> form opens immediately.
+                  Once Moolre confirms your payment, the{' '}
+                  <strong className="text-[#111827]">Register Another Business</strong> form opens automatically.
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePayNowUpgrade}
-                  disabled={paying}
-                  className={`${PRIMARY_ORANGE_BTN} px-5 py-2.5 text-xs`}
-                >
-                  {paying ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Verifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>Pay Now</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              {currentBusiness && (
+                <MoolreRenewalCheckout
+                  businessId={currentBusiness.id}
+                  businessPhone={currentBusiness.phone}
+                  defaultMomoNumber={paymentConfig?.mobile_money_number}
+                  defaultNetwork={paymentConfig?.mobile_money_provider}
+                  ctaLabel={`Activate ${SAMLEYBOOK_PLAN_NAME} — GH₵${SAMLEYBOOK_PLAN_PRICE_GHS}`}
+                  onPaymentActivated={async () => {
+                    await refreshBusinessData();
+                    setJustVerified(true);
+                  }}
+                />
+              )}
             </div>
           ) : (
-            /* REGISTER ANOTHER BUSINESS FORM (SHOWN AFTER VERIFICATION OR WHEN ALREADY PAID) */
             <form onSubmit={handleSubmit} className="space-y-4">
               {justVerified && (
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">

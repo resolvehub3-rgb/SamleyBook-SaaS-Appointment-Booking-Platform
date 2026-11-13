@@ -22,15 +22,18 @@ import { CreateBusinessModal } from './components/dashboard/CreateBusinessModal'
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { PublicBookingPage } from './components/booking/PublicBookingPage';
 import { FeedbackPage } from './components/feedback/FeedbackPage';
+import { CheckCircle2, X } from 'lucide-react';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { DatabaseSetupBanner } from './components/common/DatabaseSetupBanner';
 import { SamleyLogo } from './components/common/SamleyLogo';
+import { SubscriptionLockScreen } from './components/dashboard/SubscriptionLockScreen';
 import {
   mapDashboardTabToAppPath,
   normalizeRoutePath,
   resolveRouteAccess,
 } from './utils/app-routing';
 import { isStandalonePWA } from './utils/session-cleanup';
+import { shouldLockBusinessWorkspace } from './utils/subscription-access';
 
 function BusinessSessionLoadingScreen() {
   return (
@@ -64,13 +67,20 @@ function AppRouter() {
     clearSessionExpired,
     signOut,
   } = useAuth();
-  const { subscription } = useBusiness();
+  const {
+    businesses,
+    subscription,
+    subscriptionLoading,
+    isLoading: businessLoading,
+    refreshSubscription,
+  } = useBusiness();
 
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return normalizeRoutePath(window.location.pathname || '/');
   });
   const [isRegistering, setIsRegistering] = useState(false);
   const [createBusinessModalOpen, setCreateBusinessModalOpen] = useState(false);
+  const [renewalSuccessBanner, setRenewalSuccessBanner] = useState(false);
   const [isStandalone, setIsStandalone] = useState<boolean>(() => isStandalonePWA());
 
   useEffect(() => {
@@ -140,6 +150,35 @@ function AppRouter() {
       window.history.replaceState({}, '', normalized);
     }
   }, [currentPath, decision.kind]);
+
+  const isDashboardRoute =
+    decision.kind === 'render' && decision.target === 'dashboard';
+
+  const workspaceLockState = isDashboardRoute
+    ? shouldLockBusinessWorkspace({
+        userRole: profile?.role,
+        userEmail: user?.email,
+        businessLoading,
+        hasAnyBusiness: businesses.length > 0,
+        subscriptionLoading,
+        subscription,
+      })
+    : null;
+
+  // Re-verify subscription status on protected route navigation
+  useEffect(() => {
+    if (isDashboardRoute) {
+      void refreshSubscription();
+    }
+  }, [currentPath, isDashboardRoute, refreshSubscription]);
+
+  // Redirect locked business routes cleanly to /app/subscription
+  useEffect(() => {
+    if (workspaceLockState?.decision === 'locked' && currentPath !== '/app/subscription') {
+      window.history.replaceState({}, '', '/app/subscription');
+      setCurrentPath('/app/subscription');
+    }
+  }, [workspaceLockState?.decision, currentPath]);
 
   // 1. STANDALONE PUBLIC CUSTOMER BOOKING & FEEDBACK PORTALS
   if (decision.kind === 'render' && decision.target === 'booking') {
@@ -229,26 +268,28 @@ function AppRouter() {
       replaceToLogin();
     };
 
-    // Subscription expired: lock dashboard to renewal view + sign out back to /app/login
-    if (subscription?.status === 'expired') {
+    // Wait for business & authoritative subscription verification before rendering protected dashboard
+    if (workspaceLockState?.decision === 'loading') {
+      return (
+        <>
+          <BusinessSessionLoadingScreen />
+          <OfflineIndicator />
+        </>
+      );
+    }
+
+    // Hard lockout when trial or paid subscription is expired / blocked (no sidebar, no dashboard behind it)
+    if (workspaceLockState?.decision === 'locked') {
       return (
         <>
           <DatabaseSetupBanner />
-          <div className="min-h-screen bg-[#F5F6FA] py-8 px-4">
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
-                Your SamleyBook subscription has expired. Renew your subscription to regain access to your business dashboard and continue managing your appointments.
-              </div>
-              <SubscriptionView />
-              <button
-                type="button"
-                onClick={handleExpiredSignOut}
-                className="px-4 py-2 rounded-xl border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
+          <SubscriptionLockScreen
+            onSignOut={handleExpiredSignOut}
+            onUnlocked={() => {
+              setRenewalSuccessBanner(true);
+              navigateTo('/app/dashboard', { replace: true });
+            }}
+          />
           <OfflineIndicator />
         </>
       );
@@ -294,6 +335,24 @@ function AppRouter() {
           onLoggedOut={replaceToLogin}
           onOpenCreateBusinessModal={() => setCreateBusinessModalOpen(true)}
         >
+          {renewalSuccessBanner && (
+            <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>Subscription Renewed!</strong> Your SamleyBook Premium workspace is now unlocked for 30 days.
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-label="Dismiss renewal confirmation"
+                onClick={() => setRenewalSuccessBanner(false)}
+                className="p-1 rounded-lg hover:bg-emerald-100 text-emerald-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {renderTabView()}
         </DashboardLayout>
 

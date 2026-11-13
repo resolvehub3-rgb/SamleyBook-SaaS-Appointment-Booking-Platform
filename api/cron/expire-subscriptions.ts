@@ -18,18 +18,32 @@ export default async function handler(req: any, res: any) {
   const supabase = getServiceSupabase();
   const nowIso = new Date().toISOString();
 
-  // Expire trialing/active subscriptions past current_period_end
-  const { data: expired, error } = await supabase
+  // 1. Expire active/past_due subscriptions past current_period_end
+  const { data: expiredActive, error: activeErr } = await supabase
     .from('business_subscriptions')
-    .update({ status: 'expired', payment_status: 'none' })
-    .in('status', ['trialing', 'active', 'past_due'])
+    .update({ status: 'expired', payment_status: 'none', updated_at: nowIso })
+    .in('status', ['active', 'past_due'])
     .lt('current_period_end', nowIso)
     .select('id, business_id');
 
-  if (error) {
-    res.status(500).json({ error: error.message });
+  if (activeErr) {
+    res.status(500).json({ error: activeErr.message });
     return;
   }
 
-  res.status(200).json({ ok: true, expired: expired?.length || 0 });
+  // 2. Expire trialing subscriptions past either trial_end or current_period_end
+  const { data: expiredTrials, error: trialErr } = await supabase
+    .from('business_subscriptions')
+    .update({ status: 'expired', payment_status: 'none', updated_at: nowIso })
+    .eq('status', 'trialing')
+    .or(`trial_end.lt.${nowIso},current_period_end.lt.${nowIso}`)
+    .select('id, business_id');
+
+  if (trialErr) {
+    res.status(500).json({ error: trialErr.message });
+    return;
+  }
+
+  const totalExpired = (expiredActive?.length || 0) + (expiredTrials?.length || 0);
+  res.status(200).json({ ok: true, expired: totalExpired });
 }

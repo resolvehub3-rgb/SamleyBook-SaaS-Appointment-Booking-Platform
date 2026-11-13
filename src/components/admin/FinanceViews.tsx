@@ -73,7 +73,7 @@ export const BusinessSubscriptionsView: React.FC<BusinessSubscriptionsViewProps>
   ) => {
     onRequestConfirm({
       title: `Change Subscription Status to ${nextStatus.toUpperCase()}`,
-      description: `Update Book Premium subscription for ${
+      description: `Update SamleyBook Premium subscription for ${
         sub.business?.name || 'this business'
       } from "${sub.status}" to "${nextStatus}"? Audited in Security & Audit Logs.`,
       confirmLabel: 'Update Subscription',
@@ -99,7 +99,7 @@ export const BusinessSubscriptionsView: React.FC<BusinessSubscriptionsViewProps>
             <p className="text-[10px] font-bold uppercase tracking-widest text-[#E87936]">
               Single Platform Offering
             </p>
-            <h2 className="text-base font-bold mt-0.5">Book Premium — GH₵120.00 / 30 days</h2>
+            <h2 className="text-base font-bold mt-0.5">SamleyBook Premium — GH₵120.00 / 30 days</h2>
             <p className="text-xs text-slate-300 mt-0.5">
               Includes 7-day free trial for eligible new businesses. All features unlocked platform-wide.
             </p>
@@ -195,7 +195,7 @@ export const BusinessSubscriptionsView: React.FC<BusinessSubscriptionsViewProps>
                         <p className="text-[11px] text-slate-400">{sub.business?.category || '—'}</p>
                       </td>
                       <td className="py-3 px-4 font-semibold text-[#14243B]">
-                        Book Premium · <span className="tabular-nums">GH₵120</span>
+                        SamleyBook Premium · <span className="tabular-nums">GH₵120</span>
                       </td>
                       <td className="py-3 px-4">
                         <span

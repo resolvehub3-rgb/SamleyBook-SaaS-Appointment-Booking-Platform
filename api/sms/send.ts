@@ -9,6 +9,10 @@ import {
   accountApprovalMessage,
   feedbackInvitationMessage,
 } from '../_lib/sms.js';
+import {
+  getAuthoritativeBusinessSubscription,
+  isServerSuperAdmin,
+} from '../_lib/subscription.js';
 import crypto from 'node:crypto';
 
 interface SendBody {
@@ -125,6 +129,18 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
+      const isAdmin = await isServerSuperAdmin(supabase, authUser.id);
+      if (!isAdmin) {
+        const subCheck = await getAuthoritativeBusinessSubscription(supabase, business.id);
+        if (subCheck.evaluation.isExpired) {
+          res.status(402).json({
+            error: 'Subscription expired. Renew SamleyBook Premium to continue.',
+            code: 'SUBSCRIPTION_EXPIRED',
+          });
+          return;
+        }
+      }
+
       const recipient = normalizePhone(body.recipient || business.phone || '');
       if (!recipient) {
         res.status(400).json({ error: 'No valid recipient phone' });
@@ -211,6 +227,15 @@ export default async function handler(req: any, res: any) {
 
       if (error || !appointment) {
         res.status(404).json({ error: 'Appointment not found' });
+        return;
+      }
+
+      const subCheck = await getAuthoritativeBusinessSubscription(supabase, appointment.business_id);
+      if (subCheck.evaluation.isExpired) {
+        res.status(402).json({
+          error: 'Subscription expired. Online booking notifications are disabled until renewed.',
+          code: 'SUBSCRIPTION_EXPIRED',
+        });
         return;
       }
 
@@ -434,11 +459,24 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
+      const isAdminCaller = authUser ? await isServerSuperAdmin(supabase, authUser.id) : false;
+
       // Auth check
-      if (authUser) {
+      if (authUser && !isAdminCaller) {
         const ownerId = (appointment as any).business?.owner_id;
         if (ownerId && ownerId !== authUser.id) {
           res.status(403).json({ error: 'Access denied' });
+          return;
+        }
+      }
+
+      if (!isAdminCaller) {
+        const subCheck = await getAuthoritativeBusinessSubscription(supabase, appointment.business_id);
+        if (subCheck.evaluation.isExpired) {
+          res.status(402).json({
+            error: 'Subscription expired. Renew SamleyBook Premium to send feedback invitations.',
+            code: 'SUBSCRIPTION_EXPIRED',
+          });
           return;
         }
       }

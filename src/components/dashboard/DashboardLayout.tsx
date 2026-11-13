@@ -25,7 +25,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
-import { calculateTrialRemainingDays } from '../../utils/booking-logic';
+import { SAMLEYBOOK_PLAN_NAME } from '../../utils/subscription-access';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { NotificationsDropdown } from './ui/NotificationsDropdown';
 import { Business } from '../../types/database';
@@ -118,8 +118,14 @@ export const DashboardLayout: React.FC<Props> = ({
   children,
 }) => {
   const { profile, signOut } = useAuth();
-  const { businesses, currentBusiness, setCurrentBusiness, subscription, appointments } =
-    useBusiness();
+  const {
+    businesses,
+    currentBusiness,
+    setCurrentBusiness,
+    subscription,
+    subscriptionAccess,
+    appointments,
+  } = useBusiness();
   const shouldReduceMotion = useReducedMotion();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -160,10 +166,6 @@ export const DashboardLayout: React.FC<Props> = ({
   }, []);
 
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
-
-  const trialInfo = subscription?.trial_end
-    ? calculateTrialRemainingDays(subscription.trial_end)
-    : null;
 
   const handleLogout = async () => {
     await signOut();
@@ -215,8 +217,8 @@ export const DashboardLayout: React.FC<Props> = ({
   const currentMeta = PAGE_META[currentTab] || PAGE_META.dashboard;
   const PageIcon = currentMeta.icon;
 
-  // Format actual subscription expiry date
-  const validUntilRaw = subscription?.current_period_end || subscription?.trial_end;
+  // Format authoritative subscription expiry date
+  const validUntilRaw = subscriptionAccess.expiryIso || subscription?.current_period_end || subscription?.trial_end;
   const validUntilFormatted = validUntilRaw
     ? new Date(validUntilRaw).toLocaleDateString('en-US', {
         month: 'short',
@@ -225,17 +227,11 @@ export const DashboardLayout: React.FC<Props> = ({
       })
     : null;
 
-  const planHeading = subscription?.plan?.name
-    ? `${subscription.plan.name}${
-        subscription.status === 'active'
-          ? ' Active'
-          : subscription.status === 'trialing'
-          ? ' (Trial)'
-          : ''
-      }`
-    : subscription?.status === 'trialing'
+  const planHeading = subscriptionAccess.isPaidActive
+    ? `${SAMLEYBOOK_PLAN_NAME} Active`
+    : subscriptionAccess.isTrial
     ? '7-Day Free Trial'
-    : 'Subscription';
+    : `${SAMLEYBOOK_PLAN_NAME}`;
 
   const ownerInitial = profile?.full_name
     ? profile.full_name.trim().charAt(0).toUpperCase()
@@ -498,7 +494,7 @@ export const DashboardLayout: React.FC<Props> = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-[11.5px] font-extrabold text-white truncate">{planHeading}</p>
-                {(subscription?.status === 'active' || subscription?.status === 'trialing') && (
+                {subscriptionAccess.isAllowed && (
                   <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </span>
@@ -507,7 +503,7 @@ export const DashboardLayout: React.FC<Props> = ({
               <p className="text-[10px] text-white/65 truncate mt-0.5">
                 {validUntilFormatted
                   ? `Valid until: ${validUntilFormatted}`
-                  : `Status: ${subscription?.status || 'Trialing'}`}
+                  : `Status: ${subscriptionAccess.effectiveStatus}`}
               </p>
             </div>
           </div>
@@ -520,7 +516,7 @@ export const DashboardLayout: React.FC<Props> = ({
             }}
             className={`${PRIMARY_ORANGE_BTN} w-full py-1.5 text-[11.5px]`}
           >
-            Upgrade Plan
+            {subscriptionAccess.isTrial ? 'Renew Early (GH₵120)' : 'Manage Subscription'}
           </button>
         </div>
       </div>
@@ -628,20 +624,14 @@ export const DashboardLayout: React.FC<Props> = ({
               </a>
             )}
 
-            {trialInfo && subscription?.status === 'trialing' && (
+            {subscriptionAccess.isTrial && (
               <button
                 type="button"
                 onClick={() => onSelectTab('subscription')}
-                className={`hidden xl:inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold border shadow-[0_2px_8px_rgba(15,23,42,0.04)] transition ${
-                  trialInfo.isExpired
-                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : 'bg-white text-orange-700 border-orange-200 hover:bg-orange-50'
-                }`}
+                className="hidden xl:inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold border shadow-[0_2px_8px_rgba(15,23,42,0.04)] transition bg-white text-orange-700 border-orange-200 hover:bg-orange-50"
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>
-                  {trialInfo.isExpired ? 'Trial Expired' : `${trialInfo.daysRemaining}d Trial Left`}
-                </span>
+                <span>{subscriptionAccess.daysRemaining}d Trial Left</span>
               </button>
             )}
 

@@ -156,8 +156,12 @@ CREATE TABLE IF NOT EXISTS public.subscription_plans (
 -- Insert standard SamleyBook plan if not exists
 INSERT INTO public.subscription_plans (name, code, description, price_ghs, billing_cycle, features, is_active)
 VALUES
-    ('Book Premium', 'premium', 'One complete appointment management platform for your business.', 120.00, 'monthly', '["Online appointment booking", "Business dashboard", "Service management", "Customer management", "Appointment management", "Business booking page and QR code", "Customer feedback management", "7-day free trial"]'::jsonb, true)
-ON CONFLICT (code) DO NOTHING;
+    ('SamleyBook Premium', 'premium', 'Complete appointment booking, dashboard, SMS notifications, and customer management for your business.', 120.00, 'monthly', '["Online appointment booking", "Business dashboard", "Service management", "Customer management", "Appointment management", "Business booking page and QR code", "Customer feedback management", "7-day free trial"]'::jsonb, true)
+ON CONFLICT (code) DO UPDATE SET
+    name = EXCLUDED.name,
+    price_ghs = EXCLUDED.price_ghs,
+    billing_cycle = EXCLUDED.billing_cycle,
+    is_active = true;
 
 -- 7. BUSINESS SUBSCRIPTIONS (7-Day Trial Tracking)
 CREATE TABLE IF NOT EXISTS public.business_subscriptions (
@@ -268,12 +272,14 @@ CREATE TABLE IF NOT EXISTS public.payment_transactions (
     provider_reference TEXT,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'successful', 'failed')),
     raw_response JSONB,
+    verified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_business ON public.payment_transactions(business_id);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_appointment ON public.payment_transactions(appointment_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_moolre_ref_unique ON public.payment_transactions(moolre_reference) WHERE moolre_reference IS NOT NULL;
 
 DROP TRIGGER IF EXISTS set_payment_transactions_updated_at ON public.payment_transactions;
 CREATE TRIGGER set_payment_transactions_updated_at
@@ -337,15 +343,34 @@ ALTER TABLE public.business_closures ENABLE ROW LEVEL SECURITY;
 -- Helper function: business has active (or trialing) subscription
 CREATE OR REPLACE FUNCTION public.business_subscription_active(biz_id UUID)
 RETURNS BOOLEAN AS $$
+DECLARE
+  v_sub RECORD;
+  v_now TIMESTAMPTZ := timezone('utc'::text, now());
 BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.business_subscriptions bs
-    WHERE bs.business_id = biz_id
-      AND bs.status IN ('trialing', 'active')
-      AND bs.current_period_end >= now()
-  );
+  SELECT bs.status, bs.trial_end, bs.current_period_end
+  INTO v_sub
+  FROM public.business_subscriptions bs
+  WHERE bs.business_id = biz_id
+  ORDER BY bs.created_at DESC
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RETURN FALSE;
+  END IF;
+
+  IF v_sub.status = 'trialing' THEN
+    RETURN COALESCE(
+      LEAST(v_sub.trial_end, v_sub.current_period_end),
+      v_sub.current_period_end,
+      v_sub.trial_end
+    ) > v_now;
+  ELSIF v_sub.status = 'active' THEN
+    RETURN v_sub.current_period_end > v_now;
+  ELSE
+    RETURN FALSE;
+  END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Helper function to check if current user is Super Admin
 CREATE OR REPLACE FUNCTION public.is_super_admin()
@@ -385,10 +410,28 @@ CREATE POLICY "Public can view active businesses for booking"
     USING (is_active = true OR owner_id = auth.uid() OR public.is_super_admin());
 
 DROP POLICY IF EXISTS "Owners can insert their own businesses" ON public.businesses;
-DROP POLICY IF EXISTS "Owners can insert their own businesses" ON public.businesses;
 CREATE POLICY "Owners can insert their own businesses"
     ON public.businesses FOR INSERT
-    WITH CHECK (owner_id = auth.uid() OR public.is_super_admin());
+    WITH CHECK (
+        public.is_super_admin()
+        OR (
+            owner_id = auth.uid()
+            AND (
+                NOT EXISTS (
+                    SELECT 1 FROM public.businesses existing WHERE existing.owner_id = auth.uid()
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM public.businesses existing
+                    JOIN public.business_subscriptions bs ON bs.business_id = existing.id
+                    WHERE existing.owner_id = auth.uid()
+                      AND bs.status = 'active'
+                      AND bs.payment_status = 'paid'
+                      AND bs.current_period_end > timezone('utc'::text, now())
+                )
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS "Owners can update their own businesses" ON public.businesses;
 CREATE POLICY "Owners can update their own businesses"
@@ -396,13 +439,19 @@ CREATE POLICY "Owners can update their own businesses"
     USING (
         (owner_id = auth.uid() AND public.business_subscription_active(id))
         OR public.is_super_admin()
+    )
+    WITH CHECK (
+        (owner_id = auth.uid() AND public.business_subscription_active(id))
+        OR public.is_super_admin()
     );
 
 DROP POLICY IF EXISTS "Owners can delete their own businesses" ON public.businesses;
-DROP POLICY IF EXISTS "Owners can delete their own businesses" ON public.businesses;
 CREATE POLICY "Owners can delete their own businesses"
     ON public.businesses FOR DELETE
-    USING (owner_id = auth.uid() OR public.is_super_admin());
+    USING (
+        (owner_id = auth.uid() AND public.business_subscription_active(id))
+        OR public.is_super_admin()
+    );
 
 -- Services Policies
 DROP POLICY IF EXISTS "Public can view active services of active businesses" ON public.services;
@@ -458,29 +507,31 @@ CREATE POLICY "Owners and Super Admins can view subscriptions"
     );
 
 DROP POLICY IF EXISTS "System and Owners can insert subscription" ON public.business_subscriptions;
-DROP POLICY IF EXISTS "System and Owners can insert subscription" ON public.business_subscriptions;
 CREATE POLICY "System and Owners can insert subscription"
     ON public.business_subscriptions FOR INSERT
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = business_subscriptions.business_id AND b.owner_id = auth.uid()
+        public.is_super_admin()
+        OR (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = business_subscriptions.business_id AND b.owner_id = auth.uid()
+            )
+            AND status = 'trialing'
+            AND COALESCE(payment_status, 'none') = 'none'
+            AND NOT EXISTS (
+                SELECT 1 FROM public.business_subscriptions existing
+                WHERE existing.business_id = business_subscriptions.business_id
+            )
         )
-        OR public.is_super_admin()
     );
 
 DROP POLICY IF EXISTS "Owners and Admins can update subscription" ON public.business_subscriptions;
-DROP POLICY IF EXISTS "Owners and Admins can update subscription" ON public.business_subscriptions;
-CREATE POLICY "Owners and Admins can update subscription"
+DROP POLICY IF EXISTS "Super Admins can update subscription" ON public.business_subscriptions;
+CREATE POLICY "Super Admins can update subscription"
     ON public.business_subscriptions FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = business_subscriptions.business_id AND b.owner_id = auth.uid()
-        )
-        OR public.is_super_admin()
-    );
+    USING (public.is_super_admin())
+    WITH CHECK (public.is_super_admin());
 
 -- Payment Configurations Policies
-DROP POLICY IF EXISTS "Owners and Super Admins can view payment configs" ON public.payment_configurations;
 DROP POLICY IF EXISTS "Owners and Super Admins can view payment configs" ON public.payment_configurations;
 CREATE POLICY "Owners and Super Admins can view payment configs"
     ON public.payment_configurations FOR SELECT
@@ -492,7 +543,6 @@ CREATE POLICY "Owners and Super Admins can view payment configs"
     );
 
 DROP POLICY IF EXISTS "Public can view basic payment type for booking calculation" ON public.payment_configurations;
-DROP POLICY IF EXISTS "Public can view basic payment type for booking calculation" ON public.payment_configurations;
 CREATE POLICY "Public can view basic payment type for booking calculation"
     ON public.payment_configurations FOR SELECT
     USING (
@@ -502,12 +552,23 @@ CREATE POLICY "Public can view basic payment type for booking calculation"
     );
 
 DROP POLICY IF EXISTS "Owners can update payment configuration" ON public.payment_configurations;
-DROP POLICY IF EXISTS "Owners can update payment configuration" ON public.payment_configurations;
 CREATE POLICY "Owners can update payment configuration"
     ON public.payment_configurations FOR ALL
     USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = payment_configurations.business_id AND b.owner_id = auth.uid()
+        (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = payment_configurations.business_id AND b.owner_id = auth.uid()
+            )
+            AND public.business_subscription_active(payment_configurations.business_id)
+        )
+        OR public.is_super_admin()
+    )
+    WITH CHECK (
+        (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = payment_configurations.business_id AND b.owner_id = auth.uid()
+            )
+            AND public.business_subscription_active(payment_configurations.business_id)
         )
         OR public.is_super_admin()
     );
@@ -528,17 +589,16 @@ CREATE POLICY "Owners can view and manage their business customers"
     );
 
 DROP POLICY IF EXISTS "Public booking can insert customers" ON public.customers;
-DROP POLICY IF EXISTS "Public booking can insert customers" ON public.customers;
 CREATE POLICY "Public booking can insert customers"
     ON public.customers FOR INSERT
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.businesses b WHERE b.id = customers.business_id AND b.is_active = true
         )
+        AND public.business_subscription_active(customers.business_id)
     );
 
 -- Appointments Policies
-DROP POLICY IF EXISTS "Public can view appointment slot times to avoid double booking" ON public.appointments;
 DROP POLICY IF EXISTS "Public can view appointment slot times to avoid double booking" ON public.appointments;
 CREATE POLICY "Public can view appointment slot times to avoid double booking"
     ON public.appointments FOR SELECT
@@ -551,7 +611,6 @@ CREATE POLICY "Public can view appointment slot times to avoid double booking"
     );
 
 DROP POLICY IF EXISTS "Public can insert bookings for active businesses" ON public.appointments;
-DROP POLICY IF EXISTS "Public can insert bookings for active businesses" ON public.appointments;
 CREATE POLICY "Public can insert bookings for active businesses"
     ON public.appointments FOR INSERT
     WITH CHECK (
@@ -561,7 +620,6 @@ CREATE POLICY "Public can insert bookings for active businesses"
         AND public.business_subscription_active(appointments.business_id)
     );
 
-DROP POLICY IF EXISTS "Owners can manage appointments of their business" ON public.appointments;
 DROP POLICY IF EXISTS "Owners can manage appointments of their business" ON public.appointments;
 CREATE POLICY "Owners can manage appointments of their business"
     ON public.appointments FOR ALL
@@ -577,7 +635,6 @@ CREATE POLICY "Owners can manage appointments of their business"
 
 -- Payment Transactions Policies
 DROP POLICY IF EXISTS "Owners and Super Admins can view transactions" ON public.payment_transactions;
-DROP POLICY IF EXISTS "Owners and Super Admins can view transactions" ON public.payment_transactions;
 CREATE POLICY "Owners and Super Admins can view transactions"
     ON public.payment_transactions FOR SELECT
     USING (
@@ -588,25 +645,25 @@ CREATE POLICY "Owners and Super Admins can view transactions"
     );
 
 DROP POLICY IF EXISTS "Public can insert payment transaction during booking" ON public.payment_transactions;
-DROP POLICY IF EXISTS "Public can insert payment transaction during booking" ON public.payment_transactions;
 CREATE POLICY "Public can insert payment transaction during booking"
     ON public.payment_transactions FOR INSERT
     WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = payment_transactions.business_id AND b.is_active = true
+        public.is_super_admin()
+        OR (
+            appointment_id IS NOT NULL
+            AND EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = payment_transactions.business_id AND b.is_active = true
+            )
+            AND public.business_subscription_active(payment_transactions.business_id)
         )
     );
 
 DROP POLICY IF EXISTS "Owners can update payment transactions" ON public.payment_transactions;
-DROP POLICY IF EXISTS "Owners can update payment transactions" ON public.payment_transactions;
-CREATE POLICY "Owners can update payment transactions"
+DROP POLICY IF EXISTS "Super Admins can update payment transactions" ON public.payment_transactions;
+CREATE POLICY "Super Admins can update payment transactions"
     ON public.payment_transactions FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = payment_transactions.business_id AND b.owner_id = auth.uid()
-        )
-        OR public.is_super_admin()
-    );
+    USING (public.is_super_admin())
+    WITH CHECK (public.is_super_admin());
 
 -- SMS and Email Logs Policies
 DROP POLICY IF EXISTS "Owners and Super Admins can view logs" ON public.sms_logs;

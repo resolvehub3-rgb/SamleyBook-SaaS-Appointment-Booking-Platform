@@ -34,6 +34,7 @@ import {
   BookedSlot,
 } from '../../utils/booking-logic';
 import { getCalendarThemeBySeed } from '../../utils/dashboard-analytics';
+import { evaluateSubscriptionAccess } from '../../utils/subscription-access';
 import { SamleyLogo } from '../common/SamleyLogo';
 
 interface Props {
@@ -105,18 +106,15 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
         const b = bData as Business;
         setBusiness(b);
 
-        // Check subscription status
+        // Check subscription status authoritatively (latest subscription row + UTC expiry)
         const { data: subData } = await supabase
           .from('business_subscriptions')
-          .select('status, current_period_end')
+          .select('status, trial_end, current_period_end, payment_status')
           .eq('business_id', b.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
-        if (subData) {
-          const expired =
-            subData.status === 'expired' ||
-            new Date(subData.current_period_end) < new Date();
-          setBookingDisabled(expired);
-        }
+        setBookingDisabled(evaluateSubscriptionAccess(subData).isExpired);
 
         // 2. Get active services
         const { data: sData } = await supabase
@@ -261,7 +259,16 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
         .single();
 
       if (apptError || !newAppt) {
-        throw new Error(`Booking submission failed: ${apptError?.message}`);
+        const msg = apptError?.message || '';
+        if (
+          msg.toLowerCase().includes('row-level security') ||
+          msg.toLowerCase().includes('permission')
+        ) {
+          throw new Error(
+            'Online bookings are temporarily unavailable for this business. Please contact them directly.'
+          );
+        }
+        throw new Error(`Booking submission failed: ${msg}`);
       }
 
       // 3. Insert verified payment transaction (Moolre)
