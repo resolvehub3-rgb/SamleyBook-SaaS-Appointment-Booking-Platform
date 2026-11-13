@@ -191,7 +191,6 @@ export const AppointmentsView: React.FC = () => {
                       <p className="font-bold text-zinc-900">{appt.customer_name}</p>
                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-500">
                         <span className="font-mono">{appt.customer_phone}</span>
-                        {appt.customer_email && <span>&bull; {appt.customer_email}</span>}
                       </div>
                     </td>
 
@@ -303,7 +302,7 @@ export const AppointmentsView: React.FC = () => {
                 <p className="text-[10px] font-bold uppercase text-zinc-400">Customer</p>
                 <p className="text-sm font-bold text-zinc-900">{selectedAppt.customer_name}</p>
                 <p className="font-mono">{selectedAppt.customer_phone}</p>
-                {selectedAppt.customer_email && <p>{selectedAppt.customer_email}</p>}
+
               </div>
 
               <div className="grid grid-cols-2 gap-3">
