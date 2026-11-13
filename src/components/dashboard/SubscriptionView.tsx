@@ -20,7 +20,9 @@ export const SubscriptionView: React.FC = () => {
       const supabase = getSupabase();
       if (!supabase) return;
       const { data } = await supabase.from('subscription_plans').select('*').order('price_ghs', { ascending: true });
-      setPlans(data || []);
+      // Single plan model: only SamleyBook Monthly Subscription (GH₵120)
+      const single = (data || []).filter((p: any) => (p.code || '').toLowerCase() === 'starter');
+      setPlans(single.length ? single : (data || []).slice(0, 1));
     };
     fetchPlans();
   }, []);

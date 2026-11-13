@@ -46,6 +46,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
   const [existingBookings, setExistingBookings] = useState<BookedSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [bookingDisabled, setBookingDisabled] = useState(false);
 
   // Booking Flow Steps: 1 = Service Select, 2 = Date & Time, 3 = Customer Details & Payment, 4 = Confirmed
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -102,6 +103,19 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
 
         const b = bData as Business;
         setBusiness(b);
+
+        // Check subscription status
+        const { data: subData } = await supabase
+          .from('business_subscriptions')
+          .select('status, current_period_end')
+          .eq('business_id', b.id)
+          .maybeSingle();
+        if (subData) {
+          const expired =
+            subData.status === 'expired' ||
+            new Date(subData.current_period_end) < new Date();
+          setBookingDisabled(expired);
+        }
 
         // 2. Get active services
         const { data: sData } = await supabase
@@ -395,7 +409,17 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
               </span>
             </div>
 
-            {services.length === 0 ? (
+            {bookingDisabled ? (
+              <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-zinc-300 shadow-sm space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-7 h-7" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900">Online bookings are temporarily unavailable</h3>
+                <p className="text-sm text-zinc-500 max-w-sm mx-auto">
+                  Please contact the business directly.
+                </p>
+              </div>
+            ) : services.length === 0 ? (
               <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-zinc-300 shadow-sm space-y-3">
                 <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto">
                   <Scissors className="w-7 h-7" />

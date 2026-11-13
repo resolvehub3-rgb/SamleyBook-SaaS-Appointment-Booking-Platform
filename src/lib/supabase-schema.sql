@@ -389,7 +389,10 @@ CREATE POLICY "Owners can insert their own businesses"
 DROP POLICY IF EXISTS "Owners can update their own businesses" ON public.businesses;
 CREATE POLICY "Owners can update their own businesses"
     ON public.businesses FOR UPDATE
-    USING (owner_id = auth.uid() OR public.is_super_admin());
+    USING (
+        (owner_id = auth.uid() AND public.business_subscription_active(id))
+        OR public.is_super_admin()
+    );
 
 DROP POLICY IF EXISTS "Owners can delete their own businesses" ON public.businesses;
 CREATE POLICY "Owners can delete their own businesses"
@@ -500,8 +503,11 @@ DROP POLICY IF EXISTS "Owners can view and manage their business customers" ON p
 CREATE POLICY "Owners can view and manage their business customers"
     ON public.customers FOR ALL
     USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = customers.business_id AND b.owner_id = auth.uid()
+        (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = customers.business_id AND b.owner_id = auth.uid()
+            )
+            AND public.business_subscription_active(customers.business_id)
         )
         OR public.is_super_admin()
     );
@@ -534,14 +540,18 @@ CREATE POLICY "Public can insert bookings for active businesses"
         EXISTS (
             SELECT 1 FROM public.businesses b WHERE b.id = appointments.business_id AND b.is_active = true
         )
+        AND public.business_subscription_active(appointments.business_id)
     );
 
 DROP POLICY IF EXISTS "Owners can manage appointments of their business" ON public.appointments;
 CREATE POLICY "Owners can manage appointments of their business"
     ON public.appointments FOR ALL
     USING (
-        EXISTS (
-            SELECT 1 FROM public.businesses b WHERE b.id = appointments.business_id AND b.owner_id = auth.uid()
+        (
+            EXISTS (
+                SELECT 1 FROM public.businesses b WHERE b.id = appointments.business_id AND b.owner_id = auth.uid()
+            )
+            AND public.business_subscription_active(appointments.business_id)
         )
         OR public.is_super_admin()
     );
