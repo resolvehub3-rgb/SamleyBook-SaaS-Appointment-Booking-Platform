@@ -24,7 +24,6 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getSupabase } from '../../lib/supabase';
 import { formatGHS, calculateTrialRemainingDays } from '../../utils/booking-logic';
-import { SamleyLogo } from '../common/SamleyLogo';
 import { SMSManagementView } from './SMSManagementView';
 import { SUPABASE_SQL_SCHEMA } from '../../lib/sqlScript';
 import {
@@ -278,11 +277,23 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigateHome }) => {
     <div className="min-h-screen bg-zinc-50 flex flex-col md:flex-row text-left">
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-72 bg-zinc-900 text-white shrink-0 h-screen sticky top-0 overflow-y-auto">
-        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-          <SamleyLogo size="sm" light={true} />
-          <span className="px-2 py-0.5 rounded-full bg-orange-950 text-orange-400 text-[9px] font-black tracking-widest uppercase border border-orange-800">
-            Super Admin
-          </span>
+        <div className="p-5 border-b border-zinc-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+            <img
+              src="/assets/aistudio/logo1_6de85ee8.png"
+              alt="SamleyBook"
+              className="w-full h-full object-contain select-none"
+            />
+          </div>
+          <div className="leading-tight min-w-0 flex-1">
+            <p className="text-[18px] font-black text-white tracking-tight">SamleyBook</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="px-2 py-0.5 rounded-full bg-orange-950 text-orange-400 text-[9px] font-black tracking-widest uppercase border border-orange-800">
+                Super Admin
+              </span>
+              <span className="text-[10px] font-medium text-zinc-400 truncate">Console</span>
+            </div>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-6 space-y-1">
@@ -329,11 +340,29 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigateHome }) => {
       </aside>
 
       {/* MOBILE HEADER */}
-      <div className="md:hidden bg-zinc-900 text-white p-4 sticky top-0 z-40 flex items-center justify-between">
-        <SamleyLogo size="sm" light={true} />
+      <div className="md:hidden bg-zinc-900 text-white px-4 py-2.5 border-b border-zinc-800 sticky top-0 z-40 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+            <img
+              src="/assets/aistudio/logo1_6de85ee8.png"
+              alt="SamleyBook"
+              className="w-full h-full object-contain select-none"
+            />
+          </div>
+          <div className="leading-tight min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[15px] font-black text-white tracking-tight truncate">SamleyBook</p>
+              <span className="px-1.5 py-0.5 rounded-full bg-orange-950 text-orange-400 text-[8.5px] font-black tracking-wider uppercase border border-orange-800 shrink-0">
+                Admin
+              </span>
+            </div>
+            <p className="text-[10px] text-zinc-400 truncate">Master Console</p>
+          </div>
+        </div>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg text-zinc-400 hover:text-white"
+          aria-label="Toggle admin navigation"
+          className="p-2 rounded-lg text-zinc-400 hover:text-white shrink-0"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -343,10 +372,26 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigateHome }) => {
         <div className="md:hidden fixed inset-0 z-50 bg-black/60 flex">
           <div className="w-4/5 max-w-xs bg-zinc-900 text-white h-full p-4 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
-                <SamleyLogo size="sm" light={true} />
-                <button onClick={() => setMobileMenuOpen(false)}>
-                  <X className="w-5 h-5 text-zinc-400" />
+              <div className="flex items-center justify-between pb-4 border-b border-zinc-800 gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-white p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+                    <img
+                      src="/assets/aistudio/logo1_6de85ee8.png"
+                      alt="SamleyBook"
+                      className="w-full h-full object-contain select-none"
+                    />
+                  </div>
+                  <div className="leading-tight min-w-0">
+                    <p className="text-[16px] font-black text-white tracking-tight truncate">SamleyBook</p>
+                    <p className="text-[10px] text-zinc-400 truncate">Super Admin</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close admin menu"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 

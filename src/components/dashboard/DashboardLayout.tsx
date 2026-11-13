@@ -259,13 +259,17 @@ export const DashboardLayout: React.FC<Props> = ({
     >
       {/* Top Orange Brand Header Block */}
       <div className="bg-gradient-to-r from-[#FF6514] to-[#E64D00] px-4 py-3.5 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white text-[#F95700] flex items-center justify-center shadow-sm shrink-0">
-            <Calendar className="w-5 h-5 stroke-[2.4]" />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-sm shrink-0 overflow-hidden">
+            <img
+              src="/assets/aistudio/logo1_6de85ee8.png"
+              alt="SamleyBook"
+              className="w-full h-full object-contain select-none"
+            />
           </div>
-          <div className="leading-tight">
-            <p className="text-[18px] font-black text-white tracking-tight">SamleyBook</p>
-            <p className="text-[10px] font-semibold text-orange-100 tracking-wide">
+          <div className="leading-tight min-w-0">
+            <p className="text-[18px] font-black text-white tracking-tight truncate">SamleyBook</p>
+            <p className="text-[10px] font-semibold text-orange-100 tracking-wide truncate">
               Book &bull; Manage &bull; Grow
             </p>
           </div>
@@ -558,14 +562,18 @@ export const DashboardLayout: React.FC<Props> = ({
       </aside>
 
       {/* MOBILE TOP HEADER */}
-      <div className="md:hidden bg-white border-b border-slate-200/80 sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#F95700] text-white flex items-center justify-center">
-            <Calendar className="w-4 h-4" />
+      <div className="md:hidden bg-white border-b border-slate-200/80 sticky top-0 z-40 px-4 py-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 p-1 flex items-center justify-center shadow-2xs shrink-0 overflow-hidden">
+            <img
+              src="/assets/aistudio/logo1_6de85ee8.png"
+              alt="SamleyBook"
+              className="w-full h-full object-contain select-none"
+            />
           </div>
-          <div className="leading-tight">
-            <p className="text-sm font-black text-[#111827]">SamleyBook</p>
-            <p className="text-[10px] font-semibold text-slate-500 truncate max-w-[140px]">
+          <div className="leading-tight min-w-0">
+            <p className="text-[15px] font-black text-[#111827] tracking-tight truncate">SamleyBook</p>
+            <p className="text-[10.5px] font-semibold text-slate-500 truncate max-w-[165px]">
               {currentBusiness?.name || currentMeta.title}
             </p>
           </div>
