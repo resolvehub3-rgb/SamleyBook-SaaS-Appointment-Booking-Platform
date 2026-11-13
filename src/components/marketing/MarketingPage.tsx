@@ -18,8 +18,6 @@ import {
   Camera,
   HeartHandshake,
 } from 'lucide-react';
-import { getSupabase } from '../../lib/supabase';
-import { SubscriptionPlan } from '../../types/database';
 import { SamleyLogo } from '../common/SamleyLogo';
 
 interface Props {
@@ -27,32 +25,10 @@ interface Props {
 }
 
 export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
 
   useEffect(() => {
-    const fetchPlans = async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-
-      try {
-        const { data } = await supabase
-          .from('subscription_plans')
-          .select('*')
-          .eq('is_active', true)
-          .order('price_ghs', { ascending: true });
-
-        if (data && data.length > 0) {
-          setPlans(data as SubscriptionPlan[]);
-        }
-      } catch (err) {
-        // Fallback plans are displayed
-      }
-    };
-
-    fetchPlans();
-
     // Reveal sections on scroll
     const observer = new IntersectionObserver(
       (entries) => {
@@ -70,66 +46,6 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
     revealEls.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
-
-  const defaultPlans: SubscriptionPlan[] = [
-    {
-      id: 'plan-1',
-      name: 'Starter Plan',
-      code: 'starter',
-      description: 'Perfect for independent stylists, solo barbers, and boutique studios',
-      price_ghs: 120,
-      billing_cycle: 'monthly',
-      features: [
-        'Up to 200 appointments/month',
-        'Custom QR code booking page',
-        'Moolre Mobile Money integration',
-        'SMS booking confirmation',
-        '24h SMS appointment reminders',
-        '7-Day Free Trial included',
-      ],
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'plan-2',
-      name: 'Growth Plan',
-      code: 'growth',
-      description: 'Ideal for busy salons, spas, and expanding wellness centres',
-      price_ghs: 250,
-      billing_cycle: 'monthly',
-      features: [
-        'Unlimited appointments',
-        'Custom QR code & branding',
-        'Moolre Mobile Money integration',
-        'Priority SMS notifications',
-        'Automated 24h reminders',
-        'Customer history & notes',
-        'PWA mobile install support',
-      ],
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'plan-3',
-      name: 'Pro Plan',
-      code: 'pro',
-      description: 'For high-volume studios and premier multi-location appointment hubs',
-      price_ghs: 450,
-      billing_cycle: 'monthly',
-      features: [
-        'All Growth features',
-        'Multi-business switcher support',
-        'Highest throughput SMS gateway',
-        'Deposit & full advance payments',
-        'Dedicated SamTeck Digital support',
-        'Real-time revenue analytics',
-      ],
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-  ];
-
-  const displayPlans = plans.length > 0 ? plans : defaultPlans;
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,79 +342,70 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
               Transparent Pricing
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight">
-              Affordable Packages. Every Plan Begins With a 7-Day Free Trial.
+              One Simple Plan. 7-Day Free Trial Included.
             </h2>
             <p className="text-zinc-600 text-sm sm:text-base leading-relaxed">
               No hidden fees, no credit cards required to start. Experience everything SamleyBook offers for 7 full days before deciding.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 max-w-6xl mx-auto">
-            {displayPlans.map((plan, index) => {
-              const isPopular = plan.code === 'growth' || index === 1;
-              return (
-                <div
-                  key={plan.id}
-                  className={`relative rounded-3xl p-8 flex flex-col justify-between transition-all text-left ${
-                    isPopular
-                      ? 'bg-white border-2 border-orange-600 shadow-xl ring-4 ring-orange-100'
-                      : 'bg-white border border-zinc-200 shadow-xs hover:border-zinc-300'
-                  }`}
-                >
-                  {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-orange-600 text-white text-xs font-bold uppercase tracking-wider shadow-sm">
-                      Most Popular
-                    </div>
-                  )}
+          <div className="max-w-md mx-auto mt-16">
+            <div className="relative rounded-3xl p-8 flex flex-col justify-between transition-all text-left bg-white border-2 border-orange-600 shadow-xl ring-4 ring-orange-100">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-orange-600 text-white text-xs font-bold uppercase tracking-wider shadow-sm">
+                SamleyBook Premium
+              </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-zinc-900">{plan.name}</h3>
-                      <p className="text-xs text-zinc-500 mt-1">{plan.description}</p>
-                    </div>
-
-                    <div className="pt-2 pb-4 border-b border-zinc-100">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl sm:text-4xl font-black text-zinc-900">
-                          GHS {Number(plan.price_ghs).toFixed(2)}
-                        </span>
-                        <span className="text-xs font-semibold text-zinc-500">
-                          /{plan.billing_cycle === 'yearly' ? 'year' : 'month'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-semibold text-orange-600 mt-1">
-                        &bull; 7-Day Free Trial Active on Sign-up
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5 pt-2">
-                      <p className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
-                        Included Features:
-                      </p>
-                      {plan.features.map((feature, fIdx) => (
-                        <div key={fIdx} className="flex items-start gap-2.5 text-xs text-zinc-600">
-                          <Check className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-                          <span>{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-8">
-                    <button
-                      onClick={() => onNavigate('register')}
-                      className={`w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition ${
-                        isPopular
-                          ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-md'
-                          : 'bg-zinc-900 text-white hover:bg-zinc-800'
-                      }`}
-                    >
-                      Start 7-Day Free Trial
-                    </button>
-                  </div>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-bold text-zinc-900">SamleyBook Premium</h3>
+                  <p className="text-xs text-zinc-500 mt-1">One complete appointment management platform for your business.</p>
                 </div>
-              );
-            })}
+
+                <div className="pt-2 pb-4 border-b border-zinc-100">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl sm:text-4xl font-black text-zinc-900">
+                      GHS 120.00
+                    </span>
+                    <span className="text-xs font-semibold text-zinc-500">
+                      /month
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-semibold text-orange-600 mt-1">
+                    • 7-Day Free Trial Active on Sign-up
+                  </p>
+                </div>
+
+                <div className="space-y-2.5 pt-2">
+                  <p className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
+                    Included Features:
+                  </p>
+                  {[
+                    'Online appointment booking',
+                    'Business dashboard',
+                    'Service management',
+                    'Customer management',
+                    'Appointment management',
+                    'Business booking page and QR code',
+                    'Customer feedback management',
+                    '7-day free trial',
+                  ].map((feature, fIdx) => (
+                    <div key={fIdx} className="flex items-start gap-2.5 text-xs text-zinc-600">
+                      <Check className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-8">
+                <button
+                  onClick={() => onNavigate('register')}
+                  className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition bg-orange-600 text-white hover:bg-orange-700 shadow-md"
+                >
+                  Start Your 7-Day Free Trial
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
