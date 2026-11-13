@@ -72,6 +72,18 @@ export const OverviewView: React.FC<Props> = ({ onSelectTab }) => {
           >
             <span>Manage Services</span>
           </button>
+          <button
+            onClick={() => onSelectTab('appointments')}
+            className="relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-orange-700 text-xs font-bold shadow-xs hover:bg-orange-50 transition"
+          >
+            <Calendar className="w-4 h-4 text-orange-600" />
+            <span>Upcoming Appointments</span>
+            {upcomingAppointments.length > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-orange-600 text-white text-[10px] font-bold">
+                {upcomingAppointments.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
