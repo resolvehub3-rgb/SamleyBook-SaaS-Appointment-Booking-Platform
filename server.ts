@@ -12,9 +12,9 @@ const PORT = Number(process.env.PORT || 3000);
 const isProd = process.env.NODE_ENV === 'production';
 
 // Webhook route needs raw body for HMAC signature verification before express.json()
-app.all('/api/webhooks/sasu-sync', async (req, res) => {
+app.all('/api/webhooks/:provider', async (req, res) => {
   try {
-    const mod: any = await import('./api/webhooks/sasu-sync.ts');
+    const mod: any = await import('./api/webhooks/[provider].ts');
     if (typeof mod.default !== 'function') {
       res.status(500).json({ error: 'Handler not found' });
       return;
@@ -33,17 +33,10 @@ app.use(express.urlencoded({ extended: true }));
 
 const handlerMap: Record<string, string> = {
   '/api/admin/health': './api/admin/health.ts',
-  '/api/sms/send': './api/sms/send.ts',
-  '/api/sms/test': './api/sms/test.ts',
-  '/api/sms/config': './api/sms/config.ts',
-  '/api/feedback/validate': './api/feedback/validate.ts',
-  '/api/feedback/submit': './api/feedback/submit.ts',
-  '/api/cron/process-reminders': './api/cron/process-reminders.ts',
-  '/api/cron/expire-subscriptions': './api/cron/expire-subscriptions.ts',
-  '/api/subscriptions/initiate': './api/subscriptions/initiate.ts',
-  '/api/subscriptions/verify': './api/subscriptions/verify.ts',
-  '/api/subscriptions/status': './api/subscriptions/status.ts',
-  '/api/webhooks/moolre': './api/webhooks/moolre.ts',
+  '/api/sms/:action': './api/sms/[action].ts',
+  '/api/feedback/:action': './api/feedback/[action].ts',
+  '/api/cron/:job': './api/cron/[job].ts',
+  '/api/subscriptions/:action': './api/subscriptions/[action].ts',
 };
 
 for (const [route, modulePath] of Object.entries(handlerMap)) {
@@ -54,7 +47,7 @@ for (const [route, modulePath] of Object.entries(handlerMap)) {
         res.status(500).json({ error: 'Handler not found' });
         return;
       }
-      await mod.default(req, res);
+      await handler(req, res, mod.default);
     } catch (err) {
       console.error(`API handler error (${route}):`, err);
       if (!res.headersSent) {
@@ -62,6 +55,10 @@ for (const [route, modulePath] of Object.entries(handlerMap)) {
       }
     }
   });
+}
+
+async function handler(req: any, res: any, fn: (req: any, res: any) => Promise<void>) {
+  await fn(req, res);
 }
 
 async function startServer() {

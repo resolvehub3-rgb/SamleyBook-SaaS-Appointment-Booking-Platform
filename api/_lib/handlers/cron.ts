@@ -1,24 +1,29 @@
-import { getServiceSupabase } from '../_lib/supabase.js';
+import { getServiceSupabase } from '../supabase.js';
 import {
   sendSasuSyncSms,
   normalizePhone,
   appointmentReminderMessage,
-} from '../_lib/sms.js';
+} from '../sms.js';
 
-export default async function handler(req: any, res: any) {
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
+function verifyCronAuthorization(req: any, res: any): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.authorization || '';
     if (auth !== `Bearer ${cronSecret}`) {
       res.status(401).json({ error: 'Unauthorized' });
-      return;
+      return false;
     }
   }
+  return true;
+}
+
+export async function handleCronProcessReminders(req: any, res: any) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!verifyCronAuthorization(req, res)) return;
 
   const supabase = getServiceSupabase();
 
@@ -44,7 +49,9 @@ export default async function handler(req: any, res: any) {
   const nowIso = new Date().toISOString();
   const { data: reminders, error } = await supabase
     .from('sms_notifications')
-    .select('id, business_id, appointment_id, recipient, message, idempotency_key, submission_status, delivery_status, metadata, scheduled_for, retry_count, next_retry_at')
+    .select(
+      'id, business_id, appointment_id, recipient, message, idempotency_key, submission_status, delivery_status, metadata, scheduled_for, retry_count, next_retry_at'
+    )
     .eq('notification_type', 'appointment_reminder')
     .in('submission_status', ['pending', 'failed'])
     .lte('scheduled_for', nowIso)
@@ -76,7 +83,12 @@ export default async function handler(req: any, res: any) {
       .eq('id', reminder.appointment_id)
       .single();
 
-    if (!appointment || appointment.status === 'cancelled' || appointment.status === 'canceled' || appointment.status === 'completed') {
+    if (
+      !appointment ||
+      appointment.status === 'cancelled' ||
+      appointment.status === 'canceled' ||
+      appointment.status === 'completed'
+    ) {
       await supabase
         .from('sms_notifications')
         .update({
@@ -154,4 +166,45 @@ export default async function handler(req: any, res: any) {
   }
 
   res.status(200).json({ ok: true, processed, skipped });
+}
+
+export async function handleCronExpireSubscriptions(req: any, res: any) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!verifyCronAuthorization(req, res)) return;
+
+  const supabase = getServiceSupabase();
+  const nowIso = new Date().toISOString();
+
+  // 1. Expire active/past_due subscriptions past current_period_end
+  const { data: expiredActive, error: activeErr } = await supabase
+    .from('business_subscriptions')
+    .update({ status: 'expired', payment_status: 'none', updated_at: nowIso })
+    .in('status', ['active', 'past_due'])
+    .lt('current_period_end', nowIso)
+    .select('id, business_id');
+
+  if (activeErr) {
+    res.status(500).json({ error: activeErr.message });
+    return;
+  }
+
+  // 2. Expire trialing subscriptions past either trial_end or current_period_end
+  const { data: expiredTrials, error: trialErr } = await supabase
+    .from('business_subscriptions')
+    .update({ status: 'expired', payment_status: 'none', updated_at: nowIso })
+    .eq('status', 'trialing')
+    .or(`trial_end.lt.${nowIso},current_period_end.lt.${nowIso}`)
+    .select('id, business_id');
+
+  if (trialErr) {
+    res.status(500).json({ error: trialErr.message });
+    return;
+  }
+
+  const totalExpired = (expiredActive?.length || 0) + (expiredTrials?.length || 0);
+  res.status(200).json({ ok: true, expired: totalExpired });
 }

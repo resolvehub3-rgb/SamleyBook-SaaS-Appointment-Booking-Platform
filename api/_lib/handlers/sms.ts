@@ -1,4 +1,6 @@
-import { getServiceSupabase } from '../_lib/supabase.js';
+import crypto from 'node:crypto';
+import { getServiceSupabase } from '../supabase.js';
+import { readJson } from '../http.js';
 import {
   sendSasuSyncSms,
   fetchSasuSyncStatus,
@@ -6,14 +8,12 @@ import {
   businessRegistrationMessage,
   bookingConfirmationMessage,
   appointmentReminderMessage,
-  accountApprovalMessage,
   feedbackInvitationMessage,
-} from '../_lib/sms.js';
+} from '../sms.js';
 import {
   getAuthoritativeBusinessSubscription,
   isServerSuperAdmin,
-} from '../_lib/subscription.js';
-import crypto from 'node:crypto';
+} from '../subscription.js';
 
 interface SendBody {
   type:
@@ -47,15 +47,202 @@ function renderTemplate(content: string, vars: Record<string, string>): string {
   return msg;
 }
 
-async function readJson(req: any): Promise<any> {
-  if (req.body && typeof req.body === 'object') return req.body;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return raw ? JSON.parse(raw) : {};
+export async function handleSmsConfig(req: any, res: any) {
+  if (req.method === 'GET') {
+    const supabase = getServiceSupabase();
+    const { data: settings } = await supabase
+      .from('sms_platform_settings')
+      .select('sms_enabled, updated_at')
+      .limit(1)
+      .maybeSingle();
+
+    res.status(200).json({
+      provider: 'SasuSync',
+      configured:
+        !!process.env.SASUSYNC_API_KEY &&
+        !!process.env.SASUSYNC_SENDER_ID &&
+        !!process.env.SASUSYNC_BASE_URL &&
+        !!process.env.SASUSYNC_WEBHOOK_SECRET,
+      senderId: process.env.SASUSYNC_SENDER_ID || null,
+      baseUrl: process.env.SASUSYNC_BASE_URL || null,
+      smsEnabled: settings?.sms_enabled ?? true,
+      updatedAt: settings?.updated_at || null,
+      hasApiKey: !!process.env.SASUSYNC_API_KEY,
+      hasWebhookSecret: !!process.env.SASUSYNC_WEBHOOK_SECRET,
+    });
+    return;
+  }
+
+  if (req.method === 'POST') {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) {
+      res.status(401).json({ error: 'Unauthorized: missing access token' });
+      return;
+    }
+
+    const supabase = getServiceSupabase();
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    const user = userData?.user;
+    if (userErr || !user) {
+      res.status(401).json({ error: 'Unauthorized: invalid session' });
+      return;
+    }
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileData?.role !== 'super_admin') {
+      res.status(403).json({ error: 'Forbidden: Super Admin access required' });
+      return;
+    }
+
+    let body: any = {};
+    try {
+      body = await readJson(req);
+    } catch {
+      res.status(400).json({ error: 'Invalid JSON body' });
+      return;
+    }
+
+    const { smsEnabled } = body || {};
+    const { data: existing } = await supabase
+      .from('sms_platform_settings')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      await supabase
+        .from('sms_platform_settings')
+        .update({ sms_enabled: !!smsEnabled, updated_by: user.id })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('sms_platform_settings')
+        .insert({ sms_enabled: !!smsEnabled, updated_by: user.id });
+    }
+
+    res.status(200).json({ ok: true, smsEnabled: !!smsEnabled });
+    return;
+  }
+
+  res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default async function handler(req: any, res: any) {
+export async function handleSmsTest(req: any, res: any) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: userData } = await supabase.auth.getUser(token);
+  if (!userData?.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+
+  if (profile?.role !== 'super_admin') {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  let body: any = {};
+  try {
+    body = await readJson(req);
+  } catch {
+    res.status(400).json({ error: 'Invalid JSON body' });
+    return;
+  }
+
+  const { recipient } = body || {};
+  const phone = normalizePhone(recipient || '');
+  if (!phone) {
+    res.status(400).json({ error: 'Invalid recipient phone number' });
+    return;
+  }
+
+  // Rate limit: max 5 test SMS per 5 minutes
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from('sms_notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('notification_type', 'test_sms')
+    .gte('created_at', fiveMinAgo);
+
+  if ((count || 0) >= 5) {
+    res.status(429).json({ error: 'Rate limit exceeded. Try again later.' });
+    return;
+  }
+
+  const message =
+    'This is a test message from SamleyBook SMS Management. SasuSync integration is working correctly.';
+
+  const idempotencyKey = `test_sms:${userData.user.id}:${Date.now()}`;
+
+  const { data: record } = await supabase
+    .from('sms_notifications')
+    .insert({
+      notification_type: 'test_sms',
+      recipient: phone,
+      message,
+      idempotency_key: idempotencyKey,
+      submission_status: 'pending',
+      delivery_status: 'queued',
+      metadata: { type: 'test_sms', adminId: userData.user.id },
+    })
+    .select('id')
+    .single();
+
+  const result = await sendSasuSyncSms({
+    sender: process.env.SASUSYNC_SENDER_ID || 'SamleyBook',
+    recipients: phone,
+    message,
+    metadata: { type: 'test_sms' },
+    idempotencyKey,
+  });
+
+  await supabase
+    .from('sms_notifications')
+    .update({
+      submission_status: result.ok ? 'accepted' : 'failed',
+      delivery_status: result.ok ? 'queued' : 'failed',
+      sasusync_task_id: result.taskId,
+      error_details: result.error,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', record!.id);
+
+  // Audit log
+  await supabase.from('sms_audit_logs').insert({
+    admin_id: userData.user.id,
+    action: 'send_test_sms',
+    entity_type: 'sms_notification',
+    entity_id: record!.id,
+    details: { recipient: phone, ok: result.ok },
+  });
+
+  res.status(result.ok ? 200 : 502).json({ ok: result.ok, taskId: result.taskId, error: result.error });
+}
+
+export async function handleSmsSend(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
@@ -221,7 +408,9 @@ export default async function handler(req: any, res: any) {
 
       const { data: appointment, error } = await supabase
         .from('appointments')
-        .select('id, business_id, customer_id, customer_name, customer_phone, appointment_date, appointment_time, status, payment_status, business:businesses(name)')
+        .select(
+          'id, business_id, customer_id, customer_name, customer_phone, appointment_date, appointment_time, status, payment_status, business:businesses(name)'
+        )
         .eq('id', body.appointmentId)
         .single();
 
@@ -272,12 +461,14 @@ export default async function handler(req: any, res: any) {
         'Appointment Date': appointment.appointment_date,
         'Appointment Time': appointment.appointment_time,
       };
-      const message = template ? renderTemplate(template, vars) : bookingConfirmationMessage({
-        businessName,
-        customerName: appointment.customer_name,
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-      });
+      const message = template
+        ? renderTemplate(template, vars)
+        : bookingConfirmationMessage({
+            businessName,
+            customerName: appointment.customer_name,
+            date: appointment.appointment_date,
+            time: appointment.appointment_time,
+          });
 
       const { data: record, error: insertError } = await supabase
         .from('sms_notifications')
@@ -332,7 +523,6 @@ export default async function handler(req: any, res: any) {
         res.status(400).json({ error: 'Missing appointmentId' });
         return;
       }
-      // Reuse booking_confirmation-style lookup but reminder template
       const { data: appointment, error } = await supabase
         .from('appointments')
         .select('id, business_id, customer_name, customer_phone, appointment_date, appointment_time, status, business:businesses(name)')
@@ -376,12 +566,14 @@ export default async function handler(req: any, res: any) {
         'Appointment Date': appointment.appointment_date,
         'Appointment Time': appointment.appointment_time,
       };
-      const message = template ? renderTemplate(template, vars) : appointmentReminderMessage({
-        businessName,
-        customerName: appointment.customer_name,
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-      });
+      const message = template
+        ? renderTemplate(template, vars)
+        : appointmentReminderMessage({
+            businessName,
+            customerName: appointment.customer_name,
+            date: appointment.appointment_date,
+            time: appointment.appointment_time,
+          });
 
       const { data: record, error: insertError } = await supabase
         .from('sms_notifications')
@@ -436,16 +628,11 @@ export default async function handler(req: any, res: any) {
         return;
       }
 
-      // Optional auth: verify caller owns the business
-      let authUser: { id: string } | null = null;
-      if (token) {
-        const { data } = await supabase.auth.getUser(token);
-        if (data?.user) authUser = { id: data.user.id };
-      }
-
       const { data: appointment, error } = await supabase
         .from('appointments')
-        .select('id, business_id, customer_id, customer_name, customer_phone, status, service_id, service:services(name), business:businesses(name, owner_id)')
+        .select(
+          'id, business_id, customer_id, customer_name, customer_phone, status, service_id, service:services(name), business:businesses(name, owner_id)'
+        )
         .eq('id', body.appointmentId)
         .single();
 
@@ -602,7 +789,12 @@ export default async function handler(req: any, res: any) {
         })
         .eq('id', record.id);
 
-      res.status(result.ok ? 200 : 502).json({ ok: result.ok, taskId: result.taskId, error: result.error, feedbackLink });
+      res.status(result.ok ? 200 : 502).json({
+        ok: result.ok,
+        taskId: result.taskId,
+        error: result.error,
+        feedbackLink,
+      });
       return;
     }
 

@@ -1,19 +1,10 @@
-import crypto from 'node:crypto';
-import { getServiceSupabase } from '../_lib/supabase.js';
-import { verifyWebhookSignature } from '../_lib/sms.js';
-
-// Vercel must NOT parse the body so we can verify the raw signature.
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-async function readRawBody(req: any): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  return Buffer.concat(chunks).toString('utf8');
-}
+import { getServiceSupabase } from '../supabase.js';
+import { readJson, readRawBody } from '../http.js';
+import { verifyWebhookSignature } from '../sms.js';
+import {
+  verifyAndActivateSubscriptionPayment,
+  verifyWebhookSecretIfConfigured,
+} from '../moolre.js';
 
 const TERMINAL_STATUSES = new Set(['delivered', 'failed', 'expired']);
 
@@ -34,7 +25,7 @@ function statusRank(status: string): number {
   }
 }
 
-export default async function handler(req: any, res: any) {
+export async function handleSasuSyncWebhook(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
@@ -132,4 +123,68 @@ export default async function handler(req: any, res: any) {
     .eq('id', record.id);
 
   res.status(200).json({ ok: true });
+}
+
+export async function handleMoolreWebhook(req: any, res: any) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!verifyWebhookSecretIfConfigured(req)) {
+    res.status(401).json({ error: 'Invalid webhook secret' });
+    return;
+  }
+
+  let payload: any = {};
+  try {
+    payload = await readJson(req);
+  } catch {
+    res.status(400).json({ error: 'Invalid JSON payload' });
+    return;
+  }
+
+  const externalRef = String(
+    payload?.data?.externalref || payload?.externalref || ''
+  ).trim();
+
+  if (!externalRef) {
+    res.status(400).json({ error: 'Missing externalref in Moolre webhook payload' });
+    return;
+  }
+
+  const supabase = getServiceSupabase();
+  const { data: payment } = await supabase
+    .from('payment_transactions')
+    .select(
+      'id, business_id, appointment_id, subscription_id, plan_id, amount, currency, status, moolre_reference'
+    )
+    .eq('moolre_reference', externalRef)
+    .is('appointment_id', null)
+    .maybeSingle();
+
+  if (!payment) {
+    // Acknowledge unknown externalref to prevent infinite gateway retries
+    res.status(200).json({ ok: true, ignored: true });
+    return;
+  }
+
+  if (payment.status === 'successful') {
+    res.status(200).json({ ok: true, alreadyVerified: true });
+    return;
+  }
+
+  // Never trust webhook body alone — independently verify transaction via Moolre status API
+  const result = await verifyAndActivateSubscriptionPayment({
+    supabase,
+    payment,
+  });
+
+  res.status(200).json({
+    ok: true,
+    status: result.status,
+    activated: Boolean(result.activated),
+    alreadyVerified: Boolean(result.alreadyVerified),
+    message: result.message,
+  });
 }
