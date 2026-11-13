@@ -17,7 +17,7 @@ git push origin main
 3. Vercel auto-detects the Vite framework. Keep the defaults:
    - Build command: `pnpm build`
    - Output directory: `dist`
-   - Install command: `pnpm install`
+   - Install command: `pnpm install --no-frozen-lockfile`
 4. Click **Deploy** (first deploy will fail until env vars are added — that's expected).
 
 ## 3. Add environment variables
