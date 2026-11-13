@@ -13,7 +13,9 @@ import {
   ExternalLink,
   ShieldCheck,
   PieChart,
+  ArrowUpRight,
 } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   AdminAppointmentRecord,
   AdminAuditRecord,
@@ -105,9 +107,11 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
   onInspectBusiness,
   onInspectAppointment,
 }) => {
+  const shouldReduceMotion = useReducedMotion();
   const [apptPeriod, setApptPeriod] = useState<AdminPeriod>('daily');
   const [revPeriod, setRevPeriod] = useState<AdminPeriod>('monthly');
   const [bizPeriod, setBizPeriod] = useState<AdminPeriod>('monthly');
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
 
   const kpis = useMemo(
     () =>
@@ -318,135 +322,206 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
         className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch"
       >
         {/* Column 1: Appointment Trends */}
-        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
-          <div className="flex flex-wrap items-start justify-between gap-2.5">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#E87936] flex items-center justify-center shrink-0 mt-0.5">
-                <CalendarDays className="w-4 h-4" />
+        <motion.div
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className={`${ADMIN_CARD} overflow-hidden flex flex-col h-full bg-gradient-to-b from-orange-50/35 via-white to-white hover:shadow-md hover:border-slate-300/90 transition-all duration-200`}
+        >
+          <div className="h-[3px] w-full bg-gradient-to-r from-[#E87936] via-orange-400 to-amber-400" />
+          <div className="p-5 flex flex-col gap-3.5 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-[#FFF3EC] text-[#E87936] ring-1 ring-orange-200/70 flex items-center justify-center shrink-0 mt-0.5">
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-[#14243B] leading-snug">Appointment Trends</h2>
+                  <p className="text-[11px] text-slate-500 truncate">Scheduled bookings across platform</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-[#14243B] leading-snug">Appointment Trends</h2>
-                <p className="text-[11px] text-slate-500 truncate">Scheduled bookings across platform</p>
+              <PeriodSwitcher value={apptPeriod} onChange={setApptPeriod} />
+            </div>
+
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-2xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
+                  {apptSeriesTotal}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 truncate tabular-nums">
+                  bookings · <strong className="text-[#14243B]">{apptSeriesActiveTotal}</strong> active/done
+                </span>
               </div>
             </div>
-            <PeriodSwitcher value={apptPeriod} onChange={setApptPeriod} />
-          </div>
 
-          <div className="flex items-baseline justify-between gap-2 px-1">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
-                {apptSeriesTotal}
+            <div className="flex-1 flex flex-col justify-center">
+              <AdminLineAreaChart
+                data={apptTrendSeries}
+                accentColor="#E87936"
+                secondaryColor="#14243B"
+                showSecondaryLine
+                primaryLabel="Total"
+                secondaryLabel="confirmed/completed"
+                animationKey={`appt-${apptPeriod}`}
+                emptyText="No appointments scheduled in this timeframe yet."
+              />
+            </div>
+
+            <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+              <span className="truncate">
+                {apptPeakBucket
+                  ? `${periodWindowLabel(apptPeriod)} · Peak: ${apptPeakBucket.label} (${apptPeakBucket.value})`
+                  : periodWindowLabel(apptPeriod)}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 truncate">
-                bookings · {apptSeriesActiveTotal} active/done
-              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateSection('appointments')}
+                className="inline-flex items-center gap-0.5 font-bold text-[#E87936] hover:text-[#d06423] transition shrink-0"
+              >
+                <span>Open</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-
-          <div className="flex-1 flex flex-col justify-center">
-            <AdminLineAreaChart
-              data={apptTrendSeries}
-              accentColor="#E87936"
-              secondaryLabel="confirmed/completed"
-              emptyText="No appointments scheduled in this timeframe yet."
-            />
-          </div>
-
-          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-            <span>{periodWindowLabel(apptPeriod)}</span>
-            <span className="font-semibold text-[#14243B] tabular-nums truncate">
-              {apptPeakBucket ? `Peak: ${apptPeakBucket.label} (${apptPeakBucket.value})` : 'No peak yet'}
-            </span>
-          </div>
-        </div>
+        </motion.div>
 
         {/* Column 2: Appointment Status Breakdown */}
-        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
-          <div className="flex items-start justify-between gap-2.5">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                <PieChart className="w-4 h-4" />
+        <motion.div
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: shouldReduceMotion ? 0 : 0.07, ease: [0.16, 1, 0.3, 1] }}
+          className={`${ADMIN_CARD} overflow-hidden flex flex-col h-full bg-gradient-to-b from-blue-50/35 via-white to-white hover:shadow-md hover:border-slate-300/90 transition-all duration-200`}
+        >
+          <div className="h-[3px] w-full bg-gradient-to-r from-[#2563EB] via-blue-500 to-indigo-500" />
+          <div className="p-5 flex flex-col gap-3.5 flex-1">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2563EB] ring-1 ring-blue-200/70 flex items-center justify-center shrink-0 mt-0.5">
+                  <PieChart className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-[#14243B] leading-snug">
+                    Appointment Status Breakdown
+                  </h2>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    Click a segment to inspect distribution
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-[#14243B] leading-snug">
-                  Appointment Status Breakdown
-                </h2>
-                <p className="text-[11px] text-slate-500 truncate">
-                  Live distribution across all bookings
-                </p>
+              {selectedStatus && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatus(null)}
+                  className="text-[11px] font-bold text-blue-600 hover:underline shrink-0"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-2xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
+                  {fulfilmentRatePct}%
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 truncate">
+                  confirmed/completed rate
+                </span>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-baseline justify-between gap-2 px-1">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-xl font-extrabold text-[#14243B] tabular-nums tracking-tight">
-                {fulfilmentRatePct}%
+            <div className="flex-1 flex flex-col justify-center">
+              <AdminStatusDonut
+                items={statusBreakdown}
+                total={appointments.length}
+                selectedStatus={selectedStatus}
+                onSelectStatus={setSelectedStatus}
+              />
+            </div>
+
+            <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500 tabular-nums">
+              <span className="truncate">
+                {selectedStatus
+                  ? `${statusBreakdown.find((s) => s.status === selectedStatus)?.label || selectedStatus}: ${statusBreakdown.find((s) => s.status === selectedStatus)?.count || 0} bookings`
+                  : `Confirmed & done: ${confirmedCount + completedCount} · Pending: ${pendingCount}`}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 truncate">
-                confirmed/completed rate
-              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateSection('appointments')}
+                className="inline-flex items-center gap-0.5 font-bold text-[#2563EB] hover:text-blue-700 transition shrink-0"
+              >
+                <span>Inspect</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-
-          <div className="flex-1 flex flex-col justify-center">
-            <AdminStatusDonut items={statusBreakdown} total={appointments.length} />
-          </div>
-
-          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500 tabular-nums">
-            <span>Confirmed & done: {confirmedCount + completedCount}</span>
-            <span className="font-semibold text-[#14243B]">Pending: {pendingCount}</span>
-          </div>
-        </div>
+        </motion.div>
 
         {/* Column 3: Subscription Revenue Analytics */}
-        <div className={`${ADMIN_CARD} p-5 flex flex-col gap-4 h-full`}>
-          <div className="flex flex-wrap items-start justify-between gap-2.5">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                <CreditCard className="w-4 h-4" />
+        <motion.div
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: shouldReduceMotion ? 0 : 0.14, ease: [0.16, 1, 0.3, 1] }}
+          className={`${ADMIN_CARD} overflow-hidden flex flex-col h-full bg-gradient-to-b from-emerald-50/35 via-white to-white hover:shadow-md hover:border-slate-300/90 transition-all duration-200`}
+        >
+          <div className="h-[3px] w-full bg-gradient-to-r from-[#059669] via-emerald-500 to-teal-500" />
+          <div className="p-5 flex flex-col gap-3.5 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#059669] ring-1 ring-emerald-200/70 flex items-center justify-center shrink-0 mt-0.5">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-bold text-[#14243B] leading-snug">
+                    Subscription Revenue Analytics
+                  </h2>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    Verified SamleyBook settlements (GH₵)
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-[#14243B] leading-snug">
-                  Subscription Revenue Analytics
-                </h2>
-                <p className="text-[11px] text-slate-500 truncate">
-                  Verified SamleyBook settlements (GH₵)
-                </p>
+              <PeriodSwitcher value={revPeriod} onChange={setRevPeriod} />
+            </div>
+
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-2xl font-extrabold text-[#059669] tabular-nums tracking-tight">
+                  {formatCurrencyGhs(revenueSeriesTotal)}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 truncate tabular-nums">
+                  in series · {formatCurrencyGhs(kpis.verifiedSubscriptionRevenue)} all-time
+                </span>
               </div>
             </div>
-            <PeriodSwitcher value={revPeriod} onChange={setRevPeriod} />
-          </div>
 
-          <div className="flex items-baseline justify-between gap-2 px-1">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-xl font-extrabold text-emerald-700 tabular-nums tracking-tight">
-                {formatCurrencyGhs(revenueSeriesTotal)}
+            <div className="flex-1 flex flex-col justify-center">
+              <AdminLineAreaChart
+                data={revenueSeries}
+                accentColor="#059669"
+                secondaryLabel="verified payments"
+                valueFormatter={(v) => formatCurrencyGhs(v)}
+                axisFormatter={formatCompactGhsAxis}
+                animationKey={`rev-${revPeriod}`}
+                emptyText="No verified subscription payments recorded in this timeframe yet."
+              />
+            </div>
+
+            <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+              <span className="tabular-nums truncate">
+                {periodWindowLabel(revPeriod)} · {revenueSeriesPaymentCount}{' '}
+                {revenueSeriesPaymentCount === 1 ? 'settlement' : 'settlements'}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 truncate tabular-nums">
-                in series · {formatCurrencyGhs(kpis.verifiedSubscriptionRevenue)} all-time
-              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateSection('payments')}
+                className="inline-flex items-center gap-0.5 font-bold text-[#059669] hover:text-emerald-700 transition shrink-0"
+              >
+                <span>Audit</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-
-          <div className="flex-1 flex flex-col justify-center">
-            <AdminLineAreaChart
-              data={revenueSeries}
-              accentColor="#16A34A"
-              secondaryLabel="verified payments"
-              valueFormatter={(v) => formatCurrencyGhs(v)}
-              axisFormatter={formatCompactGhsAxis}
-              emptyText="No verified subscription payments recorded in this timeframe yet."
-            />
-          </div>
-
-          <div className="pt-3 mt-auto border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-            <span>{periodWindowLabel(revPeriod)} · Verified only</span>
-            <span className="font-semibold text-[#14243B] tabular-nums">
-              {revenueSeriesPaymentCount} {revenueSeriesPaymentCount === 1 ? 'settlement' : 'settlements'}
-            </span>
-          </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Secondary Analytics Row: Business Growth & Category Distribution */}
@@ -488,7 +563,7 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {categoryDist.slice(0, 6).map((cat) => (
+                {categoryDist.slice(0, 6).map((cat, idx) => (
                   <div key={cat.category} className="space-y-1">
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="font-semibold text-[#14243B] truncate">{cat.category}</span>
@@ -497,9 +572,15 @@ export const ExecutiveDashboardView: React.FC<ExecutiveDashboardViewProps> = ({
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[#14243B]"
-                        style={{ width: `${cat.percentage}%` }}
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-[#14243B] to-[#2B4770]"
+                        initial={shouldReduceMotion ? { width: `${cat.percentage}%` } : { width: '0%' }}
+                        animate={{ width: `${cat.percentage}%` }}
+                        transition={{
+                          duration: 0.55,
+                          delay: shouldReduceMotion ? 0 : idx * 0.05,
+                          ease: [0.16, 1, 0.3, 1],
+                        }}
                       />
                     </div>
                   </div>
