@@ -20,6 +20,7 @@ import {
   FileText,
   CalendarClock,
   Check,
+  BarChart3,
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useBusiness } from '../../context/BusinessContext';
@@ -44,6 +45,7 @@ import {
 } from '../../utils/dashboard-analytics';
 import { Appointment, AppointmentStatus } from '../../types/database';
 import { KpiSparklineCard } from './ui/KpiSparklineCard';
+import { DashboardCharts } from './ui/DashboardCharts';
 import { NewAppointmentModal } from './ui/NewAppointmentModal';
 import { PRIMARY_ORANGE_BTN, SURFACE_CARD } from './ui/DashboardTokens';
 
@@ -72,6 +74,7 @@ export const AppointmentsView: React.FC = () => {
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const openNewBookingAt = (dateStr?: string, timeStr?: string) => {
     setModalDefaultDate(dateStr || selectedDate);
@@ -724,8 +727,8 @@ export const AppointmentsView: React.FC = () => {
 
   return (
     <div className="space-y-5 text-left">
-      {/* 1. Five Pastel Gradient KPI Cards with Sparklines */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* 1. Five Pastel Gradient KPI Cards with Sparklines (2 grid cols on mobile, 5 cols on desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
         {kpis.map((metric) => {
           const targetStatus = metric.key === 'total' ? 'all' : metric.key;
           return (
@@ -734,6 +737,7 @@ export const AppointmentsView: React.FC = () => {
               metric={metric}
               totalCount={appointments.length}
               active={filterStatus === targetStatus}
+              className={metric.key === 'total' ? 'col-span-2 lg:col-span-1' : ''}
               onClick={() =>
                 setFilterStatus((prev) =>
                   prev === targetStatus && targetStatus !== 'all' ? 'all' : targetStatus
@@ -854,20 +858,41 @@ export const AppointmentsView: React.FC = () => {
           )}
         </div>
 
-        {/* SMS Feedback Toast */}
-        {smsActionMsg && (
-          <div
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border ${
-              smsActionMsg.ok
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-rose-50 border-rose-200 text-rose-800'
+        <div className="flex items-center gap-2">
+          {/* Analytics Charts Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAnalytics((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition shrink-0 ${
+              showAnalytics
+                ? 'bg-[#FFF3EC] text-[#F95700] border border-[#FED7AA]'
+                : 'bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Send className="w-3.5 h-3.5" />
-            <span>{smsActionMsg.text}</span>
-          </div>
-        )}
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>{showAnalytics ? 'Hide Charts' : 'Analytics Charts'}</span>
+          </button>
+
+          {/* SMS Feedback Toast */}
+          {smsActionMsg && (
+            <div
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+                smsActionMsg.ok
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{smsActionMsg.text}</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Collapsible Live Analytics Charts Row */}
+      {showAnalytics && (
+        <DashboardCharts appointments={appointments} services={services} />
+      )}
 
       {/* 3. Main Workspace Split: Left Calendar/List + Right Appointment Details */}
       <div className="flex flex-col xl:flex-row gap-5 items-start">

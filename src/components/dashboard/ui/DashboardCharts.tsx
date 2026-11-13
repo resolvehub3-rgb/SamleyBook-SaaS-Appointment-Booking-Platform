@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -23,6 +23,8 @@ export const DashboardCharts: React.FC<Props> = ({
   services,
   onNavigateTab,
 }) => {
+  const rawUid = useId();
+  const trendGradId = `samleyTrendFill-${rawUid.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [range, setRange] = useState<7 | 30 | 'all'>(7);
   const [metricMode, setMetricMode] = useState<'bookings' | 'revenue'>('bookings');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -49,6 +51,22 @@ export const DashboardCharts: React.FC<Props> = ({
     );
     return Math.max(...vals, 1);
   }, [dailySeries, metricMode]);
+
+  const yTicks = useMemo(() => {
+    if (metricMode === 'bookings') {
+      if (maxVal <= 4) {
+        return Array.from({ length: maxVal + 1 }, (_, i) => i / maxVal);
+      }
+      if (maxVal <= 6) {
+        const step = 2;
+        const arr: number[] = [];
+        for (let v = 0; v <= maxVal; v += step) arr.push(v / maxVal);
+        if (arr[arr.length - 1] !== 1) arr.push(1);
+        return arr;
+      }
+    }
+    return [0, 0.25, 0.5, 0.75, 1];
+  }, [metricMode, maxVal]);
 
   const rangeTotals = useMemo(() => {
     return dailySeries.reduce(
@@ -142,13 +160,25 @@ export const DashboardCharts: React.FC<Props> = ({
                 <h3 className="text-[13.5px] font-extrabold text-[#111827] truncate">
                   Appointment Volume Trend
                 </h3>
-                <p className="text-[11px] text-slate-500 truncate">
+                <p className="text-[11px] text-slate-500 truncate tabular-nums">
                   {metricMode === 'bookings'
                     ? `${rangeTotals.bookings} booking${rangeTotals.bookings !== 1 ? 's' : ''} in window`
                     : `${formatGHS(rangeTotals.revenue)} collected`}
                 </p>
               </div>
             </div>
+            {appointments.length > 0 && range !== 'all' && rangeTotals.bookings === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRange('all');
+                  setPinnedIdx(null);
+                }}
+                className="px-2 py-1 rounded-lg bg-[#FFF3EC] text-[#F95700] text-[10px] font-bold hover:bg-[#FFE4D1] transition shrink-0"
+              >
+                View All Dates
+              </button>
+            )}
           </div>
 
           {/* Interactive Controls Row */}
@@ -218,21 +248,21 @@ export const DashboardCharts: React.FC<Props> = ({
           <div className="pt-3 flex-1 flex flex-col justify-end">
             <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-40 overflow-visible">
               <defs>
-                <linearGradient id="samleyTrendFill3" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={trendGradId} x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="0%"
                     stopColor={metricMode === 'bookings' ? '#F95700' : '#16A34A'}
-                    stopOpacity="0.24"
+                    stopOpacity="0.26"
                   />
                   <stop
                     offset="100%"
                     stopColor={metricMode === 'bookings' ? '#F95700' : '#16A34A'}
-                    stopOpacity="0.01"
+                    stopOpacity="0.02"
                   />
                 </linearGradient>
               </defs>
 
-              {[0, 0.25, 0.5, 0.75, 1].map((frac, idx) => {
+              {yTicks.map((frac, idx) => {
                 const y = padY + usableH * (1 - frac);
                 const labelVal = Math.round(maxVal * frac);
                 return (
@@ -258,8 +288,18 @@ export const DashboardCharts: React.FC<Props> = ({
                 );
               })}
 
-              {areaPath && <path d={areaPath} fill="url(#samleyTrendFill3)" />}
-              {linePath && (
+              {points.length === 1 && (
+                <rect
+                  x={points[0].x - 18}
+                  y={points[0].y}
+                  width={36}
+                  height={Math.max(chartH - padY - points[0].y, 2)}
+                  rx={6}
+                  fill={`url(#${trendGradId})`}
+                />
+              )}
+              {areaPath && <path d={areaPath} fill={`url(#${trendGradId})`} />}
+              {linePath && points.length > 1 && (
                 <path
                   d={linePath}
                   fill="none"
@@ -272,6 +312,7 @@ export const DashboardCharts: React.FC<Props> = ({
 
               {points.map((pt, idx) => {
                 const isActive = activeTrendIdx === idx;
+                const hitW = Math.max(usableW / Math.max(points.length, 1), 10);
                 return (
                   <g
                     key={pt.item.date}
@@ -294,15 +335,15 @@ export const DashboardCharts: React.FC<Props> = ({
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isActive ? 5 : 3.2}
+                      r={isActive ? 5 : points.length === 1 ? 4.5 : 3.2}
                       fill="#FFFFFF"
                       stroke={metricMode === 'bookings' ? '#F95700' : '#16A34A'}
                       strokeWidth={isActive ? 2.8 : 2}
                     />
                     <rect
-                      x={pt.x - 14}
+                      x={pt.x - hitW / 2}
                       y={0}
-                      width={28}
+                      width={hitW}
                       height={chartH}
                       fill="transparent"
                     />

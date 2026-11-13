@@ -56,12 +56,13 @@ export const DashboardView: React.FC<Props> = ({ onSelectTab }) => {
   return (
     <div className="space-y-6">
       {/* Top 5 Pastel Gradient KPI Cards with Real Sparklines */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
         {kpis.map((metric) => (
           <KpiSparklineCard
             key={metric.key}
             metric={metric}
             totalCount={appointments.length}
+            className={metric.key === 'total' ? 'col-span-2 lg:col-span-1' : ''}
             onClick={() => onSelectTab('appointments')}
           />
         ))}

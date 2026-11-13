@@ -148,11 +148,27 @@ export function computeAppointmentKpis(
 
   return defs.map((def) => {
     const matching = appointments.filter(def.predicate);
-    const sparkline = last7Dates.map(
-      (ds) => matching.filter((a) => a.appointment_date === ds).length
-    );
     const current7Count = matching.filter((a) => last7Set.has(a.appointment_date)).length;
     const prev7Count = matching.filter((a) => prev7Set.has(a.appointment_date)).length;
+
+    let sparklineDates = last7Dates;
+    if (current7Count === 0 && matching.length > 0) {
+      const latestDateStr = matching
+        .map((a) => a.appointment_date)
+        .filter(Boolean)
+        .sort()
+        .pop();
+      if (latestDateStr) {
+        const latestAnchor = parseIsoDateLocal(latestDateStr);
+        sparklineDates = Array.from({ length: 7 }, (_, idx) =>
+          toIsoDateStr(addDays(latestAnchor, idx - 6))
+        );
+      }
+    }
+
+    const sparkline = sparklineDates.map(
+      (ds) => matching.filter((a) => a.appointment_date === ds).length
+    );
 
     const deltaPct =
       prev7Count > 0 ? Math.round(((current7Count - prev7Count) / prev7Count) * 100) : null;
@@ -168,14 +184,14 @@ export function computeAppointmentKpis(
 }
 
 /**
- * Generates an SVG sparkline path & area path normalized cleanly for a viewBox.
+ * Generates an SVG sparkline path, area path, and terminal point normalized cleanly for a viewBox.
  */
 export function buildSparklineSvgPaths(
   values: number[],
   width: number = 96,
   height: number = 34,
   paddingY: number = 4
-): { linePath: string; areaPath: string } {
+): { linePath: string; areaPath: string; lastPoint: { x: number; y: number } } {
   const safeValues = values.length > 1 ? values : [0, values[0] ?? 0];
   const max = Math.max(...safeValues, 0);
   const min = Math.min(...safeValues, 0);
@@ -202,7 +218,7 @@ export function buildSparklineSvgPaths(
 
   const last = points[points.length - 1];
   const areaPath = `${linePath} L ${last.x} ${height} L ${points[0].x} ${height} Z`;
-  return { linePath, areaPath };
+  return { linePath, areaPath, lastPoint: last };
 }
 
 /**

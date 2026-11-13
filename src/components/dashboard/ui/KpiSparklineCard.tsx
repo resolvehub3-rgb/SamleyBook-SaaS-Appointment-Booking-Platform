@@ -9,6 +9,7 @@ interface Props {
   active?: boolean;
   onClick?: () => void;
   totalCount?: number;
+  className?: string;
 }
 
 const ICON_MAP: Record<KpiMetricSummary['key'], LucideIcon> = {
@@ -24,12 +25,20 @@ export const KpiSparklineCard: React.FC<Props> = ({
   active = false,
   onClick,
   totalCount,
+  className = '',
 }) => {
   const shouldReduceMotion = useReducedMotion();
-  const gradId = useId();
+  const rawUid = useId();
+  const gradId = `kpi-grad-${metric.key}-${rawUid.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const theme = KPI_CARD_THEMES[metric.key];
   const Icon = ICON_MAP[metric.key];
-  const { linePath, areaPath } = buildSparklineSvgPaths(metric.sparkline, 96, 34, 4);
+  const { linePath, areaPath, lastPoint } = buildSparklineSvgPaths(
+    metric.sparkline,
+    96,
+    34,
+    5
+  );
+  const hasSparkActivity = metric.sparkline.some((v) => v > 0);
 
   // Format real delta percentage or real share of total when no previous 7-day baseline exists
   const shareOfTotal =
@@ -46,37 +55,37 @@ export const KpiSparklineCard: React.FC<Props> = ({
       whileHover={shouldReduceMotion ? undefined : { y: -2 }}
       whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
       transition={{ duration: 0.16 }}
-      className={`w-full text-left rounded-2xl border px-4 py-3.5 transition-shadow relative overflow-hidden ${
+      className={`w-full text-left rounded-2xl border px-3.5 py-3 sm:px-4 sm:py-3.5 transition-shadow relative overflow-hidden flex flex-col justify-between ${
         theme.cardBg
       } ${theme.border} ${
         active
           ? 'ring-2 ring-[#F95700] shadow-md'
           : 'shadow-[0_2px_8px_rgba(15,23,42,0.03)] hover:shadow-md'
-      }`}
+      } ${className}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3 min-w-0">
+        <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${theme.iconBg}`}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${theme.iconBg}`}
           >
-            <Icon className="w-4 h-4 stroke-[2.5]" />
+            <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[12px] font-semibold text-slate-700 truncate">
+            <p className="text-[11.5px] sm:text-[12px] font-semibold text-slate-700 truncate">
               {metric.label}
             </p>
-            <p className="text-[26px] font-extrabold text-[#111827] leading-tight tracking-tight mt-0.5">
+            <p className="text-[22px] sm:text-[26px] font-extrabold text-[#111827] leading-tight tracking-tight tabular-nums mt-0.5">
               {metric.count}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mt-1.5 flex items-end justify-between gap-2">
-        <div className="flex items-center gap-1 text-[11px] font-bold">
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-bold min-w-0">
           {metric.deltaPct !== null ? (
             <span
-              className={`inline-flex items-center gap-0.5 ${
+              className={`inline-flex items-center gap-0.5 tabular-nums whitespace-nowrap ${
                 isNegative ? 'text-[#DC2626]' : theme.deltaPositive
               }`}
             >
@@ -90,9 +99,11 @@ export const KpiSparklineCard: React.FC<Props> = ({
               </span>
             </span>
           ) : shareOfTotal !== null ? (
-            <span className={theme.deltaPositive}>{shareOfTotal}% of total</span>
+            <span className={`${theme.deltaPositive} tabular-nums whitespace-nowrap`}>
+              {shareOfTotal}% of total
+            </span>
           ) : (
-            <span className="text-slate-500 font-semibold">
+            <span className="text-slate-500 font-semibold whitespace-nowrap">
               {metric.count === 0 ? 'No records' : '7-day live'}
             </span>
           )}
@@ -101,12 +112,12 @@ export const KpiSparklineCard: React.FC<Props> = ({
         {/* Real-data Sparkline SVG */}
         <svg
           viewBox="0 0 96 34"
-          className="w-24 h-8 shrink-0 overflow-visible"
+          className="w-16 h-6 sm:w-20 lg:w-24 sm:h-8 shrink-0 overflow-visible"
           aria-hidden="true"
         >
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={theme.stroke} stopOpacity="0.28" />
+              <stop offset="0%" stopColor={theme.stroke} stopOpacity="0.32" />
               <stop offset="100%" stopColor={theme.stroke} stopOpacity="0.02" />
             </linearGradient>
           </defs>
@@ -115,10 +126,20 @@ export const KpiSparklineCard: React.FC<Props> = ({
             d={linePath}
             fill="none"
             stroke={theme.stroke}
-            strokeWidth="2.4"
+            strokeWidth="2.3"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+          {hasSparkActivity && (
+            <circle
+              cx={lastPoint.x}
+              cy={lastPoint.y}
+              r="2.6"
+              fill={theme.stroke}
+              stroke="#FFFFFF"
+              strokeWidth="1.2"
+            />
+          )}
         </svg>
       </div>
     </motion.button>

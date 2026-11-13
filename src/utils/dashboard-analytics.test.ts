@@ -60,16 +60,32 @@ test('computeAppointmentKpis: calculates real counts, sparklines, and deltas wit
   assert.equal(emptyKpis[0].count, 0);
   assert.equal(emptyKpis[0].deltaPct, null);
   assert.deepEqual(emptyKpis[0].sparkline, [0, 0, 0, 0, 0, 0, 0]);
+
+  // Appointments entirely outside trailing 7 days anchor sparkline to latest matching date
+  const historicalKpis = computeAppointmentKpis(
+    [
+      makeAppt({ id: 'h1', status: 'completed', appointment_date: '2026-10-20' }),
+      makeAppt({ id: 'h2', status: 'completed', appointment_date: '2026-10-22' }),
+      makeAppt({ id: 'h3', status: 'completed', appointment_date: '2026-10-22' }),
+    ],
+    ref
+  );
+  const completedHist = historicalKpis.find((k) => k.key === 'completed')!;
+  assert.equal(completedHist.count, 3);
+  assert.deepEqual(completedHist.sparkline, [0, 0, 0, 0, 1, 0, 2]);
 });
 
-test('buildSparklineSvgPaths: returns valid SVG line and area paths for zero and non-zero series', () => {
+test('buildSparklineSvgPaths: returns valid SVG line, area paths, and terminal point for zero and non-zero series', () => {
   const zeroPaths = buildSparklineSvgPaths([0, 0, 0, 0, 0, 0, 0]);
   assert.ok(zeroPaths.linePath.startsWith('M 0 '));
   assert.ok(zeroPaths.areaPath.endsWith('Z'));
+  assert.equal(zeroPaths.lastPoint.x, 96);
 
   const dataPaths = buildSparklineSvgPaths([1, 3, 2, 5, 4, 6, 8]);
   assert.ok(dataPaths.linePath.includes('C '));
   assert.ok(dataPaths.areaPath.endsWith('Z'));
+  assert.equal(dataPaths.lastPoint.x, 96);
+  assert.equal(dataPaths.lastPoint.y, 4);
 });
 
 test('computeDashboardCharts: computes daily series, status breakdown, and service performance from real records', () => {
