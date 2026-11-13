@@ -243,8 +243,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     manualSignOutRef.current = true;
     hadSessionRef.current = false;
     setSessionExpired(false);
+
+    // Best-effort deactivation of this device's push subscription before revoking token
     try {
       const supabase = getSupabase();
+      const accessToken = session?.access_token;
+      if (accessToken && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+        ]);
+        const sub = reg?.pushManager ? await reg.pushManager.getSubscription().catch(() => null) : null;
+        const deviceId = (() => {
+          try {
+            return window.localStorage.getItem('samley_push_device_id');
+          } catch {
+            return null;
+          }
+        })();
+
+        if (sub?.endpoint || deviceId) {
+          await fetch('/api/notifications/unsubscribe', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              endpoint: sub?.endpoint || undefined,
+              deviceId: deviceId || undefined,
+            }),
+          }).catch(() => {});
+        }
+      }
+
+      const navWithBadge = typeof navigator !== 'undefined'
+        ? (navigator as Navigator & { clearAppBadge?: () => Promise<void> })
+        : null;
+      if (navWithBadge?.clearAppBadge) {
+        await navWithBadge.clearAppBadge().catch(() => {});
+      }
+
       if (supabase) {
         await supabase.auth.signOut();
       }

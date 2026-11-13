@@ -1,5 +1,7 @@
 import { getServiceSupabase } from '../supabase.js';
 import { readJson } from '../http.js';
+import { createAndDispatchOwnerNotification } from '../push.js';
+import { buildDeepLinkDestination, buildInAppNotificationCopy } from '../../../src/utils/notifications.js';
 
 export async function handleFeedbackValidate(req: any, res: any) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -124,15 +126,19 @@ export async function handleFeedbackSubmit(req: any, res: any) {
   }
 
   // Insert feedback (unique appointment constraint prevents duplicates)
-  const { error: insertError } = await supabase.from('customer_feedback').insert({
-    business_id: tokenRow.business_id,
-    appointment_id: tokenRow.appointment_id,
-    customer_id: tokenRow.customer_id || appointment.customer_id || null,
-    feedback_token_id: tokenRow.id,
-    customer_name: customerName,
-    service_id: appointment.service_id || null,
-    feedback,
-  });
+  const { data: insertedFeedback, error: insertError } = await supabase
+    .from('customer_feedback')
+    .insert({
+      business_id: tokenRow.business_id,
+      appointment_id: tokenRow.appointment_id,
+      customer_id: tokenRow.customer_id || appointment.customer_id || null,
+      feedback_token_id: tokenRow.id,
+      customer_name: customerName,
+      service_id: appointment.service_id || null,
+      feedback,
+    })
+    .select('id')
+    .single();
 
   if (insertError) {
     // If duplicate, mark token used anyway
@@ -146,6 +152,55 @@ export async function handleFeedbackSubmit(req: any, res: any) {
   }
 
   await supabase.from('feedback_tokens').update({ used_at: new Date().toISOString() }).eq('id', tokenRow.id);
+
+  if (insertedFeedback?.id) {
+    try {
+      const [{ data: biz }, { data: svc }] = await Promise.all([
+        supabase
+          .from('businesses')
+          .select('id, name, owner_id')
+          .eq('id', tokenRow.business_id)
+          .maybeSingle(),
+        appointment.service_id
+          ? supabase.from('services').select('name').eq('id', appointment.service_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (biz?.owner_id) {
+        const copy = buildInAppNotificationCopy({
+          category: 'feedback',
+          businessName: biz.name,
+          customerName,
+          serviceName: svc?.name || 'Service',
+          feedbackPreview: feedback,
+        });
+
+        await createAndDispatchOwnerNotification(supabase, {
+          userId: biz.owner_id,
+          businessId: biz.id,
+          category: 'feedback',
+          title: copy.title,
+          body: copy.body,
+          entityType: 'feedback',
+          entityId: insertedFeedback.id,
+          destinationUrl: buildDeepLinkDestination({
+            category: 'feedback',
+            feedbackId: insertedFeedback.id,
+          }),
+          metadata: {
+            feedback_id: insertedFeedback.id,
+            appointment_id: tokenRow.appointment_id,
+            business_name: biz.name,
+            customer_name: customerName,
+            service_name: svc?.name || 'Service',
+          },
+          idempotencyKey: `feedback:${insertedFeedback.id}`,
+        });
+      }
+    } catch (pushErr) {
+      console.error('Feedback owner push error:', pushErr);
+    }
+  }
 
   res.status(200).json({ ok: true, message: 'Feedback submitted successfully. Thank you!' });
 }

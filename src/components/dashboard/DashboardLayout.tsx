@@ -28,6 +28,7 @@ import { useBusiness } from '../../context/BusinessContext';
 import { SAMLEYBOOK_PLAN_NAME } from '../../utils/subscription-access';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { NotificationsDropdown } from './ui/NotificationsDropdown';
+import { NotificationOnboardingBanner } from './ui/NotificationOnboardingBanner';
 import { Business } from '../../types/database';
 import { DASHBOARD_COLORS, PRIMARY_ORANGE_BTN } from './ui/DashboardTokens';
 import type { DashboardTab } from '../../utils/app-routing';
@@ -39,6 +40,7 @@ export type AppointmentSubMode = 'list' | 'calendar-week' | 'calendar-month' | '
 interface Props {
   currentTab: DashboardTab;
   onSelectTab: (tab: DashboardTab) => void;
+  onNavigateToUrl?: (url: string) => void;
   onLoggedOut: () => void;
   onOpenCreateBusinessModal: () => void;
   children: React.ReactNode;
@@ -113,10 +115,18 @@ const PAGE_META: Record<
 export const DashboardLayout: React.FC<Props> = ({
   currentTab,
   onSelectTab,
+  onNavigateToUrl,
   onLoggedOut,
   onOpenCreateBusinessModal,
   children,
 }) => {
+  const handleNotificationNavigate = (url: string) => {
+    if (onNavigateToUrl) {
+      onNavigateToUrl(url);
+    } else {
+      onSelectTab('appointments');
+    }
+  };
   const { profile, signOut } = useAuth();
   const {
     businesses,
@@ -565,7 +575,10 @@ export const DashboardLayout: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <NotificationsDropdown onOpenAppointments={() => onSelectTab('appointments')} />
+          <NotificationsDropdown
+            onNavigateToUrl={handleNotificationNavigate}
+            onOpenSettings={() => onSelectTab('settings')}
+          />
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -635,7 +648,10 @@ export const DashboardLayout: React.FC<Props> = ({
               </button>
             )}
 
-            <NotificationsDropdown onOpenAppointments={() => onSelectTab('appointments')} />
+            <NotificationsDropdown
+              onNavigateToUrl={handleNotificationNavigate}
+              onOpenSettings={() => onSelectTab('settings')}
+            />
 
             {/* Profile Pill Dropdown */}
             <div ref={profileMenuRef} className="relative">
@@ -741,6 +757,9 @@ export const DashboardLayout: React.FC<Props> = ({
 
         {/* Content Body */}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 pb-8 pt-2 max-w-[1600px] w-full mx-auto">
+          <NotificationOnboardingBanner
+            onOpenNotificationSettings={() => onSelectTab('settings')}
+          />
           {children}
         </main>
       </div>

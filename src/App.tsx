@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BusinessProvider, useBusiness } from './context/BusinessContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { MarketingLayout } from './components/marketing/MarketingLayout';
 import { MarketingPage } from './components/marketing/MarketingPage';
 import { LoginPage } from './components/auth/LoginPage';
@@ -34,6 +35,10 @@ import {
 } from './utils/app-routing';
 import { isStandalonePWA } from './utils/session-cleanup';
 import { shouldLockBusinessWorkspace } from './utils/subscription-access';
+import {
+  POST_LOGIN_REDIRECT_STORAGE_KEY,
+  extractInternalNotificationRedirect,
+} from './utils/notifications';
 
 function BusinessSessionLoadingScreen() {
   return (
@@ -93,15 +98,20 @@ function AppRouter() {
   }, []);
 
   const navigateTo = useCallback((pathOrRoute: string, options?: { replace?: boolean }) => {
-    const normalized = normalizeRoutePath(
-      pathOrRoute.startsWith('/') ? pathOrRoute : `/${pathOrRoute}`
-    );
-    if (window.location.pathname !== normalized) {
+    const rawTarget = pathOrRoute.startsWith('/') ? pathOrRoute : `/${pathOrRoute}`;
+    const qIndex = rawTarget.indexOf('?');
+    const pathPart = qIndex >= 0 ? rawTarget.slice(0, qIndex) : rawTarget;
+    const searchPart = qIndex >= 0 ? rawTarget.slice(qIndex) : '';
+    const normalized = normalizeRoutePath(pathPart);
+    const fullTarget = `${normalized}${searchPart}`;
+
+    if (`${window.location.pathname}${window.location.search}` !== fullTarget) {
       if (options?.replace) {
-        window.history.replaceState({}, '', normalized);
+        window.history.replaceState({}, '', fullTarget);
       } else {
-        window.history.pushState({}, '', normalized);
+        window.history.pushState({}, '', fullTarget);
       }
+      window.dispatchEvent(new CustomEvent('samley_location_change', { detail: fullTarget }));
     }
     setCurrentPath(normalized);
     if (!options?.replace) {
@@ -118,6 +128,11 @@ function AppRouter() {
   useEffect(() => {
     const handlePopState = () => {
       setCurrentPath(normalizeRoutePath(window.location.pathname || '/'));
+      window.dispatchEvent(
+        new CustomEvent('samley_location_change', {
+          detail: `${window.location.pathname}${window.location.search}`,
+        })
+      );
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -134,20 +149,37 @@ function AppRouter() {
     isRegistering,
   });
 
-  // Synchronize URL bar cleanly whenever a redirect guard fires (using replaceState to prevent back-button leaks)
+  // Synchronize URL bar cleanly whenever a redirect guard fires (and preserve notification deep link before login redirect)
   useEffect(() => {
     if (decision.kind === 'redirect' && decision.to !== currentPath) {
+      if (decision.to === '/app/login' && !user) {
+        const candidate = extractInternalNotificationRedirect(
+          `${window.location.pathname}${window.location.search}`
+        );
+        if (
+          candidate &&
+          candidate !== '/app' &&
+          candidate !== '/app/login' &&
+          candidate !== '/app/register'
+        ) {
+          try {
+            window.sessionStorage.setItem(POST_LOGIN_REDIRECT_STORAGE_KEY, candidate);
+          } catch {
+            // ignore storage errors
+          }
+        }
+      }
       window.history.replaceState({}, '', decision.to);
       setCurrentPath(decision.to);
     }
-  }, [decision, currentPath]);
+  }, [decision, currentPath, user]);
 
-  // Ensure URL bar matches canonical normalized path (e.g. legacy /login -> /app/login)
+  // Ensure URL bar matches canonical normalized path while preserving deep-link query params
   useEffect(() => {
     const raw = window.location.pathname || '/';
     const normalized = normalizeRoutePath(raw);
     if (raw !== normalized && decision.kind !== 'redirect') {
-      window.history.replaceState({}, '', normalized);
+      window.history.replaceState({}, '', `${normalized}${window.location.search}`);
     }
   }, [currentPath, decision.kind]);
 
@@ -332,6 +364,7 @@ function AppRouter() {
         <DashboardLayout
           currentTab={activeTab}
           onSelectTab={handleSelectTab}
+          onNavigateToUrl={(url) => navigateTo(url)}
           onLoggedOut={replaceToLogin}
           onOpenCreateBusinessModal={() => setCreateBusinessModalOpen(true)}
         >
@@ -383,11 +416,38 @@ function AppRouter() {
   );
 }
 
+function AppWithNotifications() {
+  const navRef = useRef<(url: string) => void>(() => {});
+  return (
+    <NotificationProvider onNavigateToRoute={(url) => navRef.current(url)}>
+      <AppRouterWithNavRef navRef={navRef} />
+    </NotificationProvider>
+  );
+}
+
+function AppRouterWithNavRef({
+  navRef,
+}: {
+  navRef: React.MutableRefObject<(url: string) => void>;
+}) {
+  useEffect(() => {
+    navRef.current = (url: string) => {
+      const target = extractInternalNotificationRedirect(url) || '/app/dashboard';
+      if (`${window.location.pathname}${window.location.search}` !== target) {
+        window.history.pushState({}, '', target);
+      }
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+  }, [navRef]);
+
+  return <AppRouter />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BusinessProvider>
-        <AppRouter />
+        <AppWithNotifications />
       </BusinessProvider>
     </AuthProvider>
   );

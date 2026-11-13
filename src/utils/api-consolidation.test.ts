@@ -10,6 +10,7 @@ import subscriptionsRouter from '../../api/subscriptions/[action]';
 import feedbackRouter from '../../api/feedback/[action]';
 import cronRouter from '../../api/cron/[job]';
 import webhooksRouter, { config as webhooksConfig } from '../../api/webhooks/[provider]';
+import notificationsRouter from '../../api/notifications/[action]';
 import adminHealthHandler from '../../api/admin/health';
 import { verifyWebhookSignature } from '../../api/_lib/sms';
 import { verifyWebhookSecretIfConfigured } from '../../api/_lib/moolre';
@@ -90,6 +91,7 @@ test('Vercel Serverless Function count under api/ is <= 12 (Hobby plan limit)', 
     'admin/health.ts',
     'cron/[job].ts',
     'feedback/[action].ts',
+    'notifications/[action].ts',
     'sms/[action].ts',
     'subscriptions/[action].ts',
     'webhooks/[provider].ts',
@@ -106,6 +108,7 @@ test('Frontend source under src/ never references server-only secrets', () => {
     'SASUSYNC_API_KEY',
     'SASUSYNC_WEBHOOK_SECRET',
     'CRON_SECRET',
+    'VAPID_PRIVATE_KEY',
   ];
 
   function scanDir(dir: string) {
@@ -164,6 +167,7 @@ test('Consolidated dynamic routers return 404 for unknown routes', async () => {
     [smsRouter, '/api/sms/unknown', 'action'],
     [subscriptionsRouter, '/api/subscriptions/unknown', 'action'],
     [feedbackRouter, '/api/feedback/unknown', 'action'],
+    [notificationsRouter, '/api/notifications/unknown', 'action'],
     [cronRouter, '/api/cron/unknown', 'job'],
     [webhooksRouter, '/api/webhooks/unknown', 'provider'],
   ] as const) {
@@ -341,4 +345,58 @@ test('Admin health handler rejects non-GET and returns 200 status report on GET'
   assert.equal(okRes.statusCode, 200);
   assert.equal(okRes.jsonBody.ok, true);
   assert.ok(Array.isArray(okRes.jsonBody.checks));
+});
+
+test('Notifications consolidated router enforces methods, Bearer auth, and CRON_SECRET', async () => {
+  {
+    const req = createMockReq({ method: 'POST', url: '/api/notifications/config', query: { action: 'config' } });
+    const res = createMockRes();
+    await notificationsRouter(req, res);
+    assert.equal(res.statusCode, 405);
+  }
+  {
+    const req = createMockReq({ method: 'GET', url: '/api/notifications/config', query: { action: 'config' } });
+    const res = createMockRes();
+    await notificationsRouter(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.ok, true);
+    assert.equal(typeof res.jsonBody.configured, 'boolean');
+  }
+  for (const [method, action] of [
+    ['POST', 'subscribe'],
+    ['POST', 'unsubscribe'],
+    ['POST', 'test'],
+  ] as const) {
+    const req = createMockReq({ method, url: `/api/notifications/${action}`, query: { action } });
+    const res = createMockRes();
+    await notificationsRouter(req, res);
+    assert.equal(res.statusCode, 401);
+  }
+  {
+    const req = createMockReq({
+      method: 'POST',
+      url: '/api/notifications/dispatch-event',
+      query: { action: 'dispatch-event' },
+      rawBody: JSON.stringify({ type: 'appointment_cancelled', appointmentId: 'appt-1' }),
+    });
+    const res = createMockRes();
+    await notificationsRouter(req, res);
+    assert.equal(res.statusCode, 401);
+  }
+
+  const prevSecret = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'notif-cron-secret';
+  try {
+    const req = createMockReq({
+      method: 'POST',
+      url: '/api/notifications/dispatch-pending',
+      query: { action: 'dispatch-pending' },
+    });
+    const res = createMockRes();
+    await notificationsRouter(req, res);
+    assert.equal(res.statusCode, 401);
+  } finally {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  }
 });

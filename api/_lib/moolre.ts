@@ -5,6 +5,8 @@ import {
   computeRenewalPeriod,
   validateMoolreSubscriptionVerification,
 } from '../../src/utils/subscription-access.js';
+import { createAndDispatchOwnerNotification } from './push.js';
+import { buildDeepLinkDestination } from '../../src/utils/notifications.js';
 
 export type GhanaMomoNetwork = 'MTN MoMo' | 'Telecel Cash' | 'AT Money';
 
@@ -391,6 +393,8 @@ export async function verifyAndActivateSubscriptionPayment(params: {
       };
     }
 
+    await notifySubscriptionRenewed(supabase, payment.business_id, payment.id);
+
     return {
       ok: true,
       status: 'successful',
@@ -482,6 +486,8 @@ export async function verifyAndActivateSubscriptionPayment(params: {
     .limit(1)
     .maybeSingle();
 
+  await notifySubscriptionRenewed(supabase, payment.business_id, payment.id);
+
   return {
     ok: true,
     status: 'successful',
@@ -489,4 +495,38 @@ export async function verifyAndActivateSubscriptionPayment(params: {
     subscription: finalSub || null,
     message: 'SamleyBook Premium renewed successfully for 30 days.',
   };
+}
+
+async function notifySubscriptionRenewed(
+  supabase: any,
+  businessId: string,
+  paymentId: string
+): Promise<void> {
+  try {
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('id, name, owner_id')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (!biz?.owner_id) return;
+
+    await createAndDispatchOwnerNotification(supabase, {
+      userId: biz.owner_id,
+      businessId: biz.id,
+      category: 'subscription',
+      title: `Subscription Renewed: ${biz.name}`,
+      body: 'Your SamleyBook Premium subscription has been verified and extended for 30 days.',
+      entityType: 'payment',
+      entityId: paymentId,
+      destinationUrl: buildDeepLinkDestination({ category: 'subscription' }),
+      metadata: {
+        tier: 'renewed',
+        business_name: biz.name,
+        payment_id: paymentId,
+      },
+      idempotencyKey: `subscription:renewed:${paymentId}`,
+    });
+  } catch (err) {
+    console.error('Failed to send subscription renewal notification:', err);
+  }
 }

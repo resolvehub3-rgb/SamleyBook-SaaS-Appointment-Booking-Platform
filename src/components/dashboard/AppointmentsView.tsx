@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useBusiness } from '../../context/BusinessContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { getSupabase } from '../../lib/supabase';
 import {
   formatGHS,
@@ -53,6 +54,7 @@ import { PRIMARY_ORANGE_BTN, SURFACE_CARD } from './ui/DashboardTokens';
 
 export const AppointmentsView: React.FC = () => {
   const { currentBusiness, appointments, services, refreshBusinessData } = useBusiness();
+  const { dispatchNotificationEvent } = useNotifications();
   const shouldReduceMotion = useReducedMotion();
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -149,8 +151,48 @@ export const AppointmentsView: React.FC = () => {
     localStorage.setItem('samley_appt_view', viewMode);
   }, [viewMode]);
 
+  // Focus deep-linked ?appointmentId=... from push notification or in-app notification centre
+  useEffect(() => {
+    const applyDeepLink = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const targetId = params.get('appointmentId');
+        if (!targetId) return;
+        const match = appointments.find((a) => a.id === targetId);
+        if (match) {
+          setFilterStatus('all');
+          setFilterServiceId('all');
+          setUpcomingOnly(false);
+          setSelectedDate(match.appointment_date);
+          setCalMonth(parseIsoDateLocal(match.appointment_date));
+          setSelectedAppt(match);
+        }
+      } catch {
+        // ignore URL parse error
+      }
+    };
+
+    applyDeepLink();
+    window.addEventListener('samley_location_change', applyDeepLink);
+    window.addEventListener('popstate', applyDeepLink);
+    return () => {
+      window.removeEventListener('samley_location_change', applyDeepLink);
+      window.removeEventListener('popstate', applyDeepLink);
+    };
+  }, [appointments]);
+
   // Keep selectedAppt synchronized when appointments refresh
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const deepLinkId = params.get('appointmentId');
+    if (deepLinkId) {
+      const target = appointments.find((a) => a.id === deepLinkId);
+      if (target) {
+        setSelectedAppt(target);
+        return;
+      }
+    }
+
     if (selectedAppt) {
       const updated = appointments.find((a) => a.id === selectedAppt.id);
       if (updated) {
@@ -274,6 +316,13 @@ export const AppointmentsView: React.FC = () => {
         setSelectedAppt((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
 
+      if (newStatus === 'cancelled' && oldStatus !== 'cancelled') {
+        void dispatchNotificationEvent({
+          type: 'appointment_cancelled',
+          appointmentId: apptId,
+        });
+      }
+
       if (newStatus === 'completed' && oldStatus !== 'completed') {
         try {
           const {
@@ -303,6 +352,9 @@ export const AppointmentsView: React.FC = () => {
     e.preventDefault();
     if (!selectedAppt || !rescheduleDate || !rescheduleTime) return;
 
+    const prevDate = selectedAppt.appointment_date;
+    const prevTime = selectedAppt.appointment_time;
+
     setRescheduleSaving(true);
     try {
       const supabase = getSupabase();
@@ -329,6 +381,12 @@ export const AppointmentsView: React.FC = () => {
           )}.`,
         });
         setRescheduleOpen(false);
+        void dispatchNotificationEvent({
+          type: 'appointment_rescheduled',
+          appointmentId: selectedAppt.id,
+          previousDate: prevDate,
+          previousTime: prevTime,
+        });
         await refreshBusinessData();
       }
       setTimeout(() => setSmsActionMsg(null), 4000);

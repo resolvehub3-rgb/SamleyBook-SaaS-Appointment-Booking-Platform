@@ -6,6 +6,10 @@ import { SamleyLogo } from '../common/SamleyLogo';
 import { SupabaseSetupModal } from '../common/SupabaseSetupModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import {
+  POST_LOGIN_REDIRECT_STORAGE_KEY,
+  resolvePostLoginDestination,
+} from '../../utils/notifications';
 
 interface Props {
   onNavigate: (route: string) => void;
@@ -156,7 +160,12 @@ export const LoginPage: React.FC<Props> = ({
               details: { method: 'password' },
             }).then(() => {}, () => {});
             await refreshProfile();
-            onNavigate('/app/admin');
+            const adminDest = resolvePostLoginDestination(
+              window.sessionStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY),
+              '/app/admin'
+            );
+            window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+            onNavigate(adminDest);
             return;
           }
 
@@ -177,13 +186,23 @@ export const LoginPage: React.FC<Props> = ({
               entity_id: user.id,
               details: { method: 'password' },
             }).then(() => {}, () => {});
-            onNavigate('/app/admin');
+            const adminDest = resolvePostLoginDestination(
+              window.sessionStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY),
+              '/app/admin'
+            );
+            window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+            onNavigate(adminDest);
             return;
           }
         }
       }
 
-      onNavigate('/app/dashboard');
+      const ownerDest = resolvePostLoginDestination(
+        window.sessionStorage.getItem(POST_LOGIN_REDIRECT_STORAGE_KEY),
+        '/app/dashboard'
+      );
+      window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_STORAGE_KEY);
+      onNavigate(ownerDest);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials';
       if (msg.toLowerCase().includes('email not confirmed')) {

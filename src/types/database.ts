@@ -204,3 +204,103 @@ export interface EmailLog {
   delivery_status: 'sent' | 'pending' | 'failed';
   sent_at: string;
 }
+
+export type NotificationCategory =
+  | 'new_booking'
+  | 'cancellation'
+  | 'reschedule'
+  | 'reminder_24h'
+  | 'reminder_1h'
+  | 'reminder_30m'
+  | 'feedback'
+  | 'subscription'
+  | 'security';
+
+export interface OwnerNotification {
+  id: string;
+  user_id: string;
+  business_id?: string | null;
+  category: NotificationCategory;
+  title: string;
+  body: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  destination_url: string;
+  metadata?: Record<string, unknown> | null;
+  idempotency_key?: string | null;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export type PushPlatform = 'android' | 'ios' | 'windows' | 'macos' | 'linux' | 'web';
+
+export interface PushSubscriptionRecord {
+  id: string;
+  user_id: string;
+  business_id?: string | null;
+  device_id: string;
+  device_name: string;
+  platform: PushPlatform;
+  user_agent?: string | null;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  is_active: boolean;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+  last_failure_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationPreferences {
+  user_id: string;
+  new_booking: boolean;
+  cancellation: boolean;
+  reschedule: boolean;
+  reminders_enabled: boolean;
+  reminder_24h: boolean;
+  reminder_1h: boolean;
+  reminder_30m: boolean;
+  feedback: boolean;
+  subscription: boolean;
+  security: boolean;
+  hide_lockscreen_details: boolean;
+  updated_at?: string;
+}
+
+export interface PushDeliveryAttempt {
+  id: string;
+  notification_id: string;
+  push_subscription_id?: string | null;
+  status:
+    | 'attempted'
+    | 'accepted'
+    | 'failed_temporary'
+    | 'failed_permanent'
+    | 'subscription_invalid'
+    | 'skipped_preference';
+  http_status?: number | null;
+  error_message?: string | null;
+  attempt_number: number;
+  created_at: string;
+}
+
+export interface AppointmentOwnerReminder {
+  id: string;
+  appointment_id: string;
+  business_id: string;
+  owner_id: string;
+  reminder_type: '24h' | '1h' | '30m';
+  appointment_start_utc: string;
+  scheduled_for: string;
+  status: 'pending' | 'sent' | 'cancelled' | 'superseded' | 'skipped_late' | 'failed';
+  idempotency_key: string;
+  notification_id?: string | null;
+  retry_count: number;
+  next_retry_at?: string | null;
+  processed_at?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -288,7 +288,7 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
         },
       });
 
-      // 4. Trigger booking confirmation SMS via backend (SasuSync)
+      // 4. Trigger booking confirmation SMS via backend (SasuSync) & owner background Web Push
       try {
         await fetch('/api/sms/send', {
           method: 'POST',
@@ -302,6 +302,15 @@ export const PublicBookingPage: React.FC<Props> = ({ businessSlug }) => {
       } catch (smsErr) {
         console.warn('Booking SMS trigger failed:', smsErr);
       }
+
+      fetch('/api/notifications/dispatch-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_booking',
+          appointmentId: newAppt.id,
+        }),
+      }).catch(() => {});
 
       // 5. Log customer confirmation email
       if (customerEmail.trim()) {

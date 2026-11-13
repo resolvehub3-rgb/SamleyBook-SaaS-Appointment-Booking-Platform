@@ -2,6 +2,7 @@ const APP_USER_LOCAL_KEYS = [
   'samley_active_business_id',
   'samley_appt_open_mode',
   'samley_appt_view',
+  'samley_post_login_redirect',
 ];
 
 /**

@@ -4,6 +4,12 @@ import {
   normalizePhone,
   appointmentReminderMessage,
 } from '../sms.js';
+import {
+  createAndDispatchOwnerNotification,
+  processDueOwnerAppointmentReminders,
+  processSubscriptionExpiryAlerts,
+} from '../push.js';
+import { buildDeepLinkDestination, buildInAppNotificationCopy } from '../../../src/utils/notifications.js';
 
 function verifyCronAuthorization(req: any, res: any): boolean {
   const cronSecret = process.env.CRON_SECRET;
@@ -27,14 +33,23 @@ export async function handleCronProcessReminders(req: any, res: any) {
 
   const supabase = getServiceSupabase();
 
-  // Respect global SMS toggle
+  // Always process due owner push appointment reminders (24h, 1h, 30m) independently of SMS toggle
+  const ownerReminderStats = await processDueOwnerAppointmentReminders(supabase, new Date());
+
+  // Respect global SMS toggle for customer SMS reminders
   const { data: settings } = await supabase
     .from('sms_platform_settings')
     .select('sms_enabled')
     .limit(1)
     .maybeSingle();
   if (settings && settings.sms_enabled === false) {
-    res.status(200).json({ ok: true, processed: 0, skipped: 0, reason: 'SMS disabled' });
+    res.status(200).json({
+      ok: true,
+      processed: 0,
+      skipped: 0,
+      reason: 'SMS disabled',
+      ownerReminders: ownerReminderStats,
+    });
     return;
   }
 
@@ -45,7 +60,7 @@ export async function handleCronProcessReminders(req: any, res: any) {
     .eq('template_key', 'appointment_reminder')
     .maybeSingle();
 
-  // Process pending reminder records that are due
+  // Process pending SMS reminder records that are due
   const nowIso = new Date().toISOString();
   const { data: reminders, error } = await supabase
     .from('sms_notifications')
@@ -59,7 +74,7 @@ export async function handleCronProcessReminders(req: any, res: any) {
     .limit(10);
 
   if (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, ownerReminders: ownerReminderStats });
     return;
   }
 
@@ -165,7 +180,7 @@ export async function handleCronProcessReminders(req: any, res: any) {
     else skipped++;
   }
 
-  res.status(200).json({ ok: true, processed, skipped });
+  res.status(200).json({ ok: true, processed, skipped, ownerReminders: ownerReminderStats });
 }
 
 export async function handleCronExpireSubscriptions(req: any, res: any) {
@@ -177,7 +192,8 @@ export async function handleCronExpireSubscriptions(req: any, res: any) {
   if (!verifyCronAuthorization(req, res)) return;
 
   const supabase = getServiceSupabase();
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
 
   // 1. Expire active/past_due subscriptions past current_period_end
   const { data: expiredActive, error: activeErr } = await supabase
@@ -205,6 +221,43 @@ export async function handleCronExpireSubscriptions(req: any, res: any) {
     return;
   }
 
-  const totalExpired = (expiredActive?.length || 0) + (expiredTrials?.length || 0);
-  res.status(200).json({ ok: true, expired: totalExpired });
+  const newlyExpired = [...(expiredActive || []), ...(expiredTrials || [])];
+  for (const row of newlyExpired) {
+    try {
+      const { data: biz } = await supabase
+        .from('businesses')
+        .select('id, name, owner_id')
+        .eq('id', row.business_id)
+        .maybeSingle();
+      if (!biz?.owner_id) continue;
+      const copy = buildInAppNotificationCopy({
+        category: 'subscription',
+        businessName: biz.name,
+        subscriptionExpired: true,
+      });
+      await createAndDispatchOwnerNotification(supabase, {
+        userId: biz.owner_id,
+        businessId: biz.id,
+        category: 'subscription',
+        title: copy.title,
+        body: copy.body,
+        entityType: 'subscription',
+        entityId: row.id,
+        destinationUrl: buildDeepLinkDestination({ category: 'subscription' }),
+        metadata: { tier: 'expired', business_name: biz.name },
+        idempotencyKey: `subscription:${biz.id}:expired:${nowIso.slice(0, 10)}`,
+      });
+    } catch (notifErr) {
+      console.error('Subscription expired push error:', notifErr);
+    }
+  }
+
+  // Also check 3-day and 1-day approaching expiry alerts
+  const alertStats = await processSubscriptionExpiryAlerts(supabase, now);
+
+  res.status(200).json({
+    ok: true,
+    expired: newlyExpired.length,
+    subscriptionNotificationsSent: alertStats.notificationsSent,
+  });
 }

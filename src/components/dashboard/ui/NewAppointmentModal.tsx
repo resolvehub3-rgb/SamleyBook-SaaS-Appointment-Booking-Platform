@@ -13,6 +13,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useBusiness } from '../../../context/BusinessContext';
+import { useNotifications } from '../../../context/NotificationContext';
 import { getSupabase } from '../../../lib/supabase';
 import { calculateEndTime, formatGHS, isValidGhanaPhone } from '../../../utils/booking-logic';
 import {
@@ -37,6 +38,7 @@ export const NewAppointmentModal: React.FC<Props> = ({
   onCreated,
 }) => {
   const { currentBusiness, services, appointments, refreshBusinessData } = useBusiness();
+  const { dispatchNotificationEvent } = useNotifications();
 
   const activeServices = services.filter((s) => s.is_active);
   const [serviceId, setServiceId] = useState<string>('');
@@ -172,6 +174,13 @@ export const NewAppointmentModal: React.FC<Props> = ({
         } catch {
           // Non-blocking SMS notification
         }
+      }
+
+      if (inserted?.id) {
+        void dispatchNotificationEvent({
+          type: 'new_booking',
+          appointmentId: inserted.id,
+        });
       }
 
       await refreshBusinessData();

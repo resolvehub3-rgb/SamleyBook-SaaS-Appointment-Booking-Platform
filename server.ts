@@ -38,6 +38,7 @@ const handlerMap: Record<string, string> = {
   '/api/feedback/:action': './api/feedback/[action].ts',
   '/api/cron/:job': './api/cron/[job].ts',
   '/api/subscriptions/:action': './api/subscriptions/[action].ts',
+  '/api/notifications/:action': './api/notifications/[action].ts',
 };
 
 for (const [route, modulePath] of Object.entries(handlerMap)) {

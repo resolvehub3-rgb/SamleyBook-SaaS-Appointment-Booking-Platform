@@ -110,7 +110,19 @@ export default async function handler(req: any, res: any) {
     checkedAt,
   });
 
-  // 4. Cron Secret / Background Automation Readiness
+  // 4. Web Push (VAPID) Environment Readiness
+  const pushConfigured = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  checks.push({
+    key: 'web_push',
+    label: 'Web Push Notifications (VAPID)',
+    status: pushConfigured ? 'healthy' : 'unconfigured',
+    detail: pushConfigured
+      ? 'VAPID public/private keys configured for background Web Push delivery.'
+      : 'VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY is missing from server environment.',
+    checkedAt,
+  });
+
+  // 5. Cron Secret / Background Automation Readiness
   const hasCronSecret = !!process.env.CRON_SECRET;
   checks.push({
     key: 'cron',

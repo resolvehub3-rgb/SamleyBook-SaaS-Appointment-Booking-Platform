@@ -43,6 +43,37 @@ export const FeedbackView: React.FC = () => {
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [focusedFeedbackId, setFocusedFeedbackId] = useState<string | null>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('feedbackId');
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const syncFocus = () => {
+      try {
+        setFocusedFeedbackId(new URLSearchParams(window.location.search).get('feedbackId'));
+      } catch {
+        setFocusedFeedbackId(null);
+      }
+    };
+    window.addEventListener('samley_location_change', syncFocus);
+    window.addEventListener('popstate', syncFocus);
+    return () => {
+      window.removeEventListener('samley_location_change', syncFocus);
+      window.removeEventListener('popstate', syncFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!focusedFeedbackId || feedback.length === 0) return;
+    const el = document.getElementById(`feedback-card-${focusedFeedbackId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedFeedbackId, feedback]);
 
   const fetchFeedback = async () => {
     if (!currentBusiness?.id) return;
@@ -258,10 +289,17 @@ export const FeedbackView: React.FC = () => {
               minute: '2-digit',
             });
 
+            const isFocused = focusedFeedbackId === f.id;
+
             return (
               <article
+                id={`feedback-card-${f.id}`}
                 key={f.id}
-                className={`${SURFACE_CARD} p-5 sm:p-6 flex flex-col justify-between gap-4 hover:border-[#FADAC1] hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-all`}
+                className={`${SURFACE_CARD} p-5 sm:p-6 flex flex-col justify-between gap-4 transition-all ${
+                  isFocused
+                    ? 'ring-2 ring-[#F95700] border-[#F95700] bg-orange-50/20 shadow-lg'
+                    : 'hover:border-[#FADAC1] hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)]'
+                }`}
               >
                 <div className="space-y-4">
                   {/* Top Row: Customer Identity & Verified Badge */}

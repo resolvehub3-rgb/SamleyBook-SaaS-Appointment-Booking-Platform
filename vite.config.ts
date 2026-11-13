@@ -10,6 +10,9 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg', 'Logo.png'],
@@ -45,22 +48,9 @@ export default defineConfig(() => {
             },
           ],
         },
-        workbox: {
+        injectManifest: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-          cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true,
-          navigateFallbackDenylist: [/^\/api\//],
-          runtimeCaching: [
-            {
-              urlPattern: ({url}) => url.pathname.startsWith('/api/'),
-              handler: 'NetworkOnly',
-            },
-            {
-              urlPattern: ({url}) => url.hostname.endsWith('.supabase.co'),
-              handler: 'NetworkOnly',
-            },
-          ],
         },
         devOptions: {
           enabled: true,
