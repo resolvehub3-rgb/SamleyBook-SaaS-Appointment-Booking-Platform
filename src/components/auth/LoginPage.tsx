@@ -4,13 +4,22 @@ import { useAuth } from '../../context/AuthContext';
 import { getSupabase, getSupabaseCredentials } from '../../lib/supabase';
 import { SamleyLogo } from '../common/SamleyLogo';
 import { SupabaseSetupModal } from '../common/SupabaseSetupModal';
+import { PWAInstallButton } from '../common/PWAInstallButton';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 
 interface Props {
   onNavigate: (route: string) => void;
+  sessionExpired?: boolean;
+  onDismissSessionExpired?: () => void;
 }
 
-export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
+export const LoginPage: React.FC<Props> = ({
+  onNavigate,
+  sessionExpired = false,
+  onDismissSessionExpired,
+}) => {
   const { signIn, signUp, refreshProfile, isConfigured } = useAuth();
+  const { isInstalled } = usePWAInstall();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -147,7 +156,7 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
               details: { method: 'password' },
             }).then(() => {}, () => {});
             await refreshProfile();
-            onNavigate('admin');
+            onNavigate('/app/admin');
             return;
           }
 
@@ -168,13 +177,13 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
               entity_id: user.id,
               details: { method: 'password' },
             }).then(() => {}, () => {});
-            onNavigate('admin');
+            onNavigate('/app/admin');
             return;
           }
         }
       }
 
-      onNavigate('dashboard');
+      onNavigate('/app/dashboard');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Invalid login credentials';
       if (msg.toLowerCase().includes('email not confirmed')) {
@@ -191,14 +200,11 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
     <>
       <div className="min-h-screen bg-zinc-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-          <button
-            onClick={() => onNavigate('home')}
-            className="inline-block focus:outline-none mb-6"
-          >
+          <div className="inline-block mb-6">
             <SamleyLogo size="lg" />
-          </button>
+          </div>
           <h2 className="text-2xl font-black text-zinc-900 tracking-tight">
-            Sign In to SamleyBook
+            Sign In to SamleyBook Business
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
             Access your business appointment dashboard or admin portal
@@ -207,6 +213,25 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
           <div className="bg-white py-8 px-6 sm:px-10 shadow-xl rounded-3xl border border-zinc-200/80 text-left">
+            {sessionExpired && (
+              <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-bold">Session Expired</p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Your session has ended or expired. Please sign in again to access your dashboard.
+                  </p>
+                </div>
+                {onDismissSessionExpired && (
+                  <button
+                    type="button"
+                    onClick={onDismissSessionExpired}
+                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                  >
+                    Dismiss
+                  </button>
+                )}
+              </div>
+            )}
             {!isConfigured && (
               <div className="mb-5 p-3.5 rounded-xl bg-orange-50 border border-orange-200 text-xs text-orange-900 flex items-start justify-between gap-2">
                 <div>
@@ -374,16 +399,27 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
 
             <div className="mt-6 pt-6 border-t border-zinc-100 flex flex-col items-center gap-3 text-center">
               <p className="text-xs text-zinc-500">
-                Don't have a business account yet?{' '}
+                Don&apos;t have a business account yet?{' '}
                 <button
-                  onClick={() => onNavigate('register')}
+                  type="button"
+                  onClick={() => onNavigate('/app/register')}
                   className="font-bold text-orange-600 hover:text-orange-700"
                 >
                   Register here
                 </button>
               </p>
 
+              <PWAInstallButton variant="secondary" className="mt-1" />
 
+              {!isInstalled && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/')}
+                  className="text-[11px] font-medium text-zinc-400 hover:text-zinc-600 transition pt-1"
+                >
+                  &larr; Back to SamleyBook Website
+                </button>
+              )}
             </div>
           </div>
         </div>

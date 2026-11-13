@@ -11,32 +11,33 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['Logo.png'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg', 'Logo.png'],
         manifest: {
-          id: '/',
-          name: 'SamleyBook — Appointment Booking',
+          id: '/app/',
+          name: 'SamleyBook Business',
           short_name: 'SamleyBook',
-          description: 'Multi-tenant SaaS appointment-booking platform by SamTeck Digital',
+          description: 'Multi-tenant SaaS appointment-booking business application by SamTeck Digital',
           theme_color: '#ea580c',
           background_color: '#ffffff',
           display: 'standalone',
+          orientation: 'portrait-primary',
           start_url: '/app/login',
-          scope: '/',
+          scope: '/app/',
           icons: [
             {
-              src: '/Logo.png',
+              src: '/pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/Logo.png',
+              src: '/pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/Logo.png',
+              src: '/pwa-maskable-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
@@ -45,9 +46,25 @@ export default defineConfig(() => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          navigateFallbackDenylist: [/^\/api\//],
+          runtimeCaching: [
+            {
+              urlPattern: ({url}) => url.pathname.startsWith('/api/'),
+              handler: 'NetworkOnly',
+            },
+            {
+              urlPattern: ({url}) => url.hostname.endsWith('.supabase.co'),
+              handler: 'NetworkOnly',
+            },
+          ],
         },
         devOptions: {
-          enabled: false,
+          enabled: true,
+          type: 'module',
+          navigateFallback: 'index.html',
         },
       }),
     ],

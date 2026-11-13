@@ -73,3 +73,11 @@ with the `X-Webhook-Signature` header signed using `SASUSYNC_WEBHOOK_SECRET`.
 - Webhook signature failures: confirm `bodyParser` is disabled for the webhook
   (already configured) and the raw body is used.
 - Missing env vars surface as `Missing SUPABASE_URL...` errors in function logs.
+
+## 6. Marketing Website vs Business App PWA Architecture
+
+- **Public Marketing Website**: Served at `/`, `/features`, `/pricing`, `/about`, `/faq`, `/contact` with dedicated marketing header/footer (`MarketingLayout`).
+- **Public Customer Booking & Feedback**: Served at `/b/:slug` and `/feedback/:token` without requiring customer login.
+- **Standalone Business Application & Installed PWA**: Served strictly under `/app/*` (`/app/login`, `/app/register`, `/app/dashboard`, `/app/appointments`, `/app/services`, `/app/customers`, `/app/payments`, `/app/payment-config`, `/app/booking-page`, `/app/subscription`, `/app/business-profile`, `/app/settings`, `/app/admin`).
+- **PWA Manifest**: Uses `start_url: "/app/login"`, `scope: "/app/"`, `id: "/app/"`, `display: "standalone"`. Installed PWAs launch into `/app/login`, silently restore valid Supabase sessions straight into `/app/dashboard` (or `/app/admin`), and always return to `/app/login` on Sign Out or session expiration.
+- **Future Custom Subdomain Option**: If moving to a custom domain later (e.g., `samleybook.com` for marketing and `app.samleybook.com` for the business application), update Supabase Authentication **Site URL** and **Redirect URLs** to include both origins, and note that Supabase `localStorage` session tokens are origin-scoped (moving from `*.vercel.app` to `app.samleybook.com` requires one-time sign-in on the new origin).

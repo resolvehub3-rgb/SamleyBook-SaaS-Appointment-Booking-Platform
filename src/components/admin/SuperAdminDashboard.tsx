@@ -29,10 +29,10 @@ import {
 
 interface Props {
   onNavigate?: (route: string) => void;
-  onNavigateHome?: () => void;
+  onLoggedOut?: () => void;
 }
 
-export const SuperAdminDashboard: React.FC<Props> = ({ onNavigate, onNavigateHome }) => {
+export const SuperAdminDashboard: React.FC<Props> = ({ onNavigate, onLoggedOut }) => {
   const { profile, user, signOut } = useAuth();
   const [activeSection, setActiveSection] = useState<AdminSectionId>('dashboard');
   const [loading, setLoading] = useState(true);
@@ -516,10 +516,10 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigate, onNavigateHom
 
   const handleSignOut = async () => {
     await signOut();
-    if (onNavigate) {
-      onNavigate('login');
-    } else if (onNavigateHome) {
-      onNavigateHome();
+    if (onLoggedOut) {
+      onLoggedOut();
+    } else if (onNavigate) {
+      onNavigate('/app/login');
     }
   };
 
@@ -541,7 +541,7 @@ export const SuperAdminDashboard: React.FC<Props> = ({ onNavigate, onNavigateHom
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => (onNavigate ? onNavigate('dashboard') : onNavigateHome?.())}
+              onClick={() => onNavigate?.('/app/dashboard')}
               className="px-4 py-2 rounded-xl bg-[#14243B] text-white text-xs font-bold hover:bg-[#1e3352] transition"
             >
               Return to Portal

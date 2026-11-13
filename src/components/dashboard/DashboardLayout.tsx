@@ -30,27 +30,16 @@ import { PWAInstallButton } from '../common/PWAInstallButton';
 import { NotificationsDropdown } from './ui/NotificationsDropdown';
 import { Business } from '../../types/database';
 import { DASHBOARD_COLORS, PRIMARY_ORANGE_BTN } from './ui/DashboardTokens';
+import type { DashboardTab } from '../../utils/app-routing';
 
-export type DashboardTab =
-  | 'dashboard'
-  | 'overview'
-  | 'services'
-  | 'appointments'
-  | 'feedback'
-  | 'customers'
-  | 'payments'
-  | 'payment-config'
-  | 'booking-page'
-  | 'subscription'
-  | 'business-profile'
-  | 'settings';
+export type { DashboardTab };
 
 export type AppointmentSubMode = 'list' | 'calendar-week' | 'calendar-month' | 'calendar-day' | 'upcoming';
 
 interface Props {
   currentTab: DashboardTab;
   onSelectTab: (tab: DashboardTab) => void;
-  onNavigateHome: () => void;
+  onLoggedOut: () => void;
   onOpenCreateBusinessModal: () => void;
   children: React.ReactNode;
 }
@@ -124,7 +113,7 @@ const PAGE_META: Record<
 export const DashboardLayout: React.FC<Props> = ({
   currentTab,
   onSelectTab,
-  onNavigateHome,
+  onLoggedOut,
   onOpenCreateBusinessModal,
   children,
 }) => {
@@ -178,7 +167,7 @@ export const DashboardLayout: React.FC<Props> = ({
 
   const handleLogout = async () => {
     await signOut();
-    onNavigateHome();
+    onLoggedOut();
   };
 
   const handleSelectBusiness = (b: Business) => {

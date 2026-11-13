@@ -15,11 +15,21 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'Home', href: 'home' },
-    { label: 'Features', href: 'features' },
-    { label: 'Pricing', href: 'pricing' },
-    { label: 'Contact', href: 'contact' },
+    { label: 'Home', href: '/', sectionId: 'home' },
+    { label: 'Features', href: '/features', sectionId: 'features' },
+    { label: 'Pricing', href: '/pricing', sectionId: 'pricing' },
+    { label: 'About', href: '/about', sectionId: 'about' },
+    { label: 'FAQ', href: '/faq', sectionId: 'faq' },
+    { label: 'Contact', href: '/contact', sectionId: 'contact' },
   ];
+
+  const handleSectionLink = (href: string, sectionId: string) => {
+    onNavigate(href);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(sectionId);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    });
+  };
 
   return (
     <>
@@ -27,7 +37,8 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Logo with SamTeck Digital Attribution */}
           <button
-            onClick={() => onNavigate('home')}
+            type="button"
+            onClick={() => handleSectionLink('/', 'home')}
             className="text-left focus:outline-none"
             aria-label="SamleyBook Home"
           >
@@ -35,17 +46,14 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8" aria-label="Marketing Navigation">
             {navLinks.map((link) => (
               <button
                 key={link.href}
-                onClick={() => {
-                  onNavigate(link.href);
-                  const el = document.getElementById(link.href);
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
+                type="button"
+                onClick={() => handleSectionLink(link.href, link.sectionId)}
                 className={`text-sm font-semibold transition ${
-                  currentRoute === link.href
+                  currentRoute === link.sectionId
                     ? 'text-orange-600'
                     : 'text-zinc-600 hover:text-zinc-900'
                 }`}
@@ -61,11 +69,12 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
 
             {user ? (
               <button
+                type="button"
                 onClick={() => {
                   if (profile?.role === 'super_admin') {
-                    onNavigate('admin');
+                    onNavigate('/app/admin');
                   } else {
-                    onNavigate('dashboard');
+                    onNavigate('/app/dashboard');
                   }
                 }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-orange-600 text-white hover:bg-orange-700 shadow-sm transition"
@@ -76,13 +85,15 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
             ) : (
               <>
                 <button
-                  onClick={() => onNavigate('login')}
+                  type="button"
+                  onClick={() => onNavigate('/app/login')}
                   className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition"
                 >
                   Sign In
                 </button>
                 <button
-                  onClick={() => onNavigate('register')}
+                  type="button"
+                  onClick={() => onNavigate('/app/register')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-orange-600 text-white hover:bg-orange-700 shadow-sm transition"
                 >
                   <span>Register Your Business</span>
@@ -95,6 +106,7 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-2">
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 focus:outline-none"
               aria-label="Toggle navigation menu"
@@ -110,11 +122,10 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
             {navLinks.map((link) => (
               <button
                 key={link.href}
+                type="button"
                 onClick={() => {
-                  onNavigate(link.href);
+                  handleSectionLink(link.href, link.sectionId);
                   setMobileMenuOpen(false);
-                  const el = document.getElementById(link.href);
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}
                 className="block w-full text-left px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 rounded-lg"
               >
@@ -126,12 +137,13 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
               <PWAInstallButton variant="sidebar" />
               {user ? (
                 <button
+                  type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
                     if (profile?.role === 'super_admin') {
-                      onNavigate('admin');
+                      onNavigate('/app/admin');
                     } else {
-                      onNavigate('dashboard');
+                      onNavigate('/app/dashboard');
                     }
                   }}
                   className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-orange-600 text-white"
@@ -142,18 +154,20 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
               ) : (
                 <>
                   <button
+                    type="button"
                     onClick={() => {
                       setMobileMenuOpen(false);
-                      onNavigate('login');
+                      onNavigate('/app/login');
                     }}
                     className="w-full text-center py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border border-zinc-200 text-zinc-800"
                   >
                     Sign In
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setMobileMenuOpen(false);
-                      onNavigate('register');
+                      onNavigate('/app/register');
                     }}
                     className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-orange-600 text-white"
                   >
@@ -166,7 +180,6 @@ export const MarketingNav: React.FC<Props> = ({ onNavigate, currentRoute }) => {
           </div>
         )}
       </header>
-
     </>
   );
 };

@@ -17,16 +17,41 @@ import {
   Scissors,
   Camera,
   HeartHandshake,
+  ChevronDown,
 } from 'lucide-react';
-import { SamleyLogo } from '../common/SamleyLogo';
 
 interface Props {
   onNavigate: (route: string) => void;
+  initialSection?: string;
 }
 
-export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
+const FAQ_ITEMS = [
+  {
+    q: 'Do my customers need to create an account or download an app to book?',
+    a: 'No. Every business receives a unique booking URL and printable QR code. Customers simply scan the QR code or tap your link, select a service, pick an open slot, and confirm in seconds.',
+  },
+  {
+    q: 'How does the 7-day free trial work?',
+    a: 'When you register your business, SamleyBook automatically activates a full 7-day free trial with no credit card required upfront. You can configure services, generate your QR standee, and receive real bookings immediately.',
+  },
+  {
+    q: 'How do Mobile Money payments and deposits work?',
+    a: 'You configure your Mobile Money destination and choose full payment or a deposit requirement inside Payment Configuration. Customer payment status is tracked in real time alongside every appointment.',
+  },
+  {
+    q: 'Can I install SamleyBook on my phone or computer like an app?',
+    a: 'Yes. SamleyBook includes a standalone Progressive Web App (PWA) for business owners. Once installed from the Business Portal or Settings, opening the app launches straight into your Business Dashboard or Login screen.',
+  },
+  {
+    q: 'Does SamleyBook send SMS confirmations and reminders?',
+    a: 'Yes. Automated SMS notifications confirm new bookings and send timely appointment reminders to keep clients punctual and reduce no-shows.',
+  },
+];
+
+export const MarketingPage: React.FC<Props> = ({ onNavigate, initialSection }) => {
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   useEffect(() => {
     // Reveal sections on scroll
@@ -46,6 +71,15 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
     revealEls.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!initialSection || initialSection === 'home') return;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(initialSection);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [initialSection]);
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,14 +141,16 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
               {/* Primary Actions */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
                 <button
-                  onClick={() => onNavigate('register')}
+                  type="button"
+                  onClick={() => onNavigate('/app/register')}
                   className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-orange-600 text-white font-bold text-sm tracking-wide shadow-md hover:bg-orange-700 hover:shadow-lg transition-all"
                 >
                   <span>Start 7-Day Free Trial</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => onNavigate('login')}
+                  type="button"
+                  onClick={() => onNavigate('/app/login')}
                   className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl border border-zinc-200 text-zinc-800 font-semibold text-sm hover:bg-zinc-50 transition"
                 >
                   <span>Sign In to Dashboard</span>
@@ -289,7 +325,7 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
       </section>
 
       {/* HOW IT WORKS */}
-      <section data-reveal className="py-20 bg-white border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
+      <section id="how-it-works" data-reveal className="py-20 bg-white border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
@@ -399,13 +435,94 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
 
               <div className="pt-8">
                 <button
-                  onClick={() => onNavigate('register')}
+                  type="button"
+                  onClick={() => onNavigate('/app/register')}
                   className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition bg-orange-600 text-white hover:bg-orange-700 shadow-md"
                 >
                   Start Your 7-Day Free Trial
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ABOUT SAMLEYBOOK */}
+      <section id="about" data-reveal className="py-20 bg-white border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center text-left">
+            <div className="lg:col-span-6 space-y-4">
+              <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
+                About SamleyBook
+              </span>
+              <h2 className="text-3xl font-black text-zinc-900 tracking-tight">
+                Built by SamTeck Digital for Modern Service Businesses
+              </h2>
+              <p className="text-sm text-zinc-600 leading-relaxed">
+                SamleyBook is engineered to replace fragmented DMs, missed calls, and paper appointment notebooks with one reliable multi-tenant platform tailored for salons, barbershops, spas, studios, and independent service teams.
+              </p>
+              <p className="text-sm text-zinc-600 leading-relaxed">
+                Every business operates in its own isolated workspace with real-time schedule synchronization, verified Mobile Money payment workflows, automated SMS notifications, and instant QR-code client booking.
+              </p>
+            </div>
+            <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { title: 'Multi-Tenant Isolation', detail: 'Row Level Security protects every business workspace, customer list, and payment record.' },
+                { title: 'Built-In QR & Web Booking', detail: 'Launch a public booking link and printable QR standee the moment you finish onboarding.' },
+                { title: 'Automated SMS Lifecycle', detail: 'Confirmations, reminders, and post-visit feedback links run automatically.' },
+                { title: 'Standalone Business PWA', detail: 'Install directly onto your device for dedicated one-tap dashboard access.' },
+              ].map((card) => (
+                <div key={card.title} className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200 space-y-2">
+                  <h3 className="text-sm font-bold text-zinc-900">{card.title}</h3>
+                  <p className="text-xs text-zinc-600 leading-relaxed">{card.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FREQUENTLY ASKED QUESTIONS */}
+      <section id="faq" data-reveal className="py-20 bg-zinc-50/50 border-b border-zinc-100 opacity-0 translate-y-8 transition-all duration-700 ease-out">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-left">
+          <div className="text-center space-y-3 mb-12">
+            <span className="text-xs font-bold tracking-widest text-orange-600 uppercase">
+              Frequently Asked Questions
+            </span>
+            <h2 className="text-3xl font-black text-zinc-900 tracking-tight">
+              Everything You Need to Know
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {FAQ_ITEMS.map((item, idx) => {
+              const isOpen = openFaqIndex === idx;
+              return (
+                <div
+                  key={item.q}
+                  className="rounded-2xl bg-white border border-zinc-200/90 overflow-hidden transition"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                    aria-expanded={isOpen}
+                    className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left"
+                  >
+                    <span className="text-sm font-bold text-zinc-900">{item.q}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-zinc-500 shrink-0 transition-transform ${
+                        isOpen ? 'rotate-180 text-orange-600' : ''
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 pt-1 text-xs text-zinc-600 leading-relaxed border-t border-zinc-100">
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -541,28 +658,6 @@ export const MarketingPage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="py-12 bg-zinc-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-zinc-800">
-            <SamleyLogo size="md" light={true} />
-            <p className="text-xs text-zinc-400 text-center md:text-right max-w-md">
-              SamleyBook is the modern appointment SaaS designed specifically for service-based businesses. A proud product of SamTeck Digital.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 text-[11px] text-zinc-500">
-            <p>&copy; {new Date().getFullYear()} SamleyBook. A product by SamTeck Digital. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <button onClick={() => onNavigate('login')} className="hover:text-white transition">
-                Owner Login
-              </button>
-              <button onClick={() => onNavigate('register')} className="hover:text-white transition">
-                Register Business
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

@@ -20,13 +20,16 @@ import { useBusiness } from '../../context/BusinessContext';
 import { getSupabase, uploadBusinessAsset } from '../../lib/supabase';
 import { generateBusinessSlug, isValidGhanaPhone } from '../../utils/booking-logic';
 import { SamleyLogo } from '../common/SamleyLogo';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 
 interface Props {
   onNavigate: (route: string) => void;
+  onRegistrationStateChange?: (active: boolean) => void;
 }
 
-export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
+export const RegisterPage: React.FC<Props> = ({ onNavigate, onRegistrationStateChange }) => {
   const { signUp } = useAuth();
+  const { isInstalled } = usePWAInstall();
   const { refreshBusinesses } = useBusiness();
 
   // Stage 1 vs 2
@@ -114,6 +117,7 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
     }
 
     setIsSubmitting(true);
+    onRegistrationStateChange?.(true);
 
     try {
       const supabase = getSupabase();
@@ -224,9 +228,11 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
 
       setSuccess(true);
       setTimeout(() => {
-        onNavigate('dashboard');
+        onRegistrationStateChange?.(false);
+        onNavigate('/app/dashboard');
       }, 2000);
     } catch (err) {
+      onRegistrationStateChange?.(false);
       setErrorMsg(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setIsSubmitting(false);
@@ -236,12 +242,9 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <button
-          onClick={() => onNavigate('home')}
-          className="inline-block focus:outline-none mb-6"
-        >
+        <div className="inline-block mb-6">
           <SamleyLogo size="lg" />
-        </button>
+        </div>
 
         <h2 className="text-2xl font-black text-zinc-900 tracking-tight">
           Register Your Business
@@ -571,16 +574,26 @@ export const RegisterPage: React.FC<Props> = ({ onNavigate }) => {
             </form>
           )}
 
-          <div className="mt-6 pt-6 border-t border-zinc-100 text-center">
+          <div className="mt-6 pt-6 border-t border-zinc-100 text-center space-y-2">
             <p className="text-xs text-zinc-500">
               Already have an account?{' '}
               <button
-                onClick={() => onNavigate('login')}
+                type="button"
+                onClick={() => onNavigate('/app/login')}
                 className="font-bold text-orange-600 hover:text-orange-700"
               >
                 Sign in here
               </button>
             </p>
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={() => onNavigate('/')}
+                className="text-[11px] font-medium text-zinc-400 hover:text-zinc-600 transition"
+              >
+                &larr; Back to SamleyBook Website
+              </button>
+            )}
           </div>
         </div>
       </div>
