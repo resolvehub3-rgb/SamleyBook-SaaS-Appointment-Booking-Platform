@@ -6,11 +6,13 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const handlerMap: Record<string, string> = {
+  '/api/admin/health': './admin/health.ts',
   '/api/sms/send': './sms/send.ts',
   '/api/sms/test': './sms/test.ts',
   '/api/sms/config': './sms/config.ts',
   '/api/feedback/validate': './feedback/validate.ts',
   '/api/feedback/submit': './feedback/submit.ts',
+  '/api/subscriptions/verify': './subscriptions/verify.ts',
   '/api/cron/process-reminders': './cron/process-reminders.ts',
   '/api/webhooks/sasu-sync': './webhooks/sasu-sync.ts',
 };

@@ -124,7 +124,7 @@ function AppRouter() {
   if (currentPath.startsWith('/app/admin')) {
     if (authLoading) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-white text-xs">
+        <div className="min-h-screen flex items-center justify-center bg-[#14243B] text-white text-xs font-semibold">
           Authenticating Super Admin...
         </div>
       );
@@ -142,7 +142,10 @@ function AppRouter() {
     return (
       <>
         <DatabaseSetupBanner />
-        <SuperAdminDashboard onNavigateHome={() => navigateTo('/')} />
+        <SuperAdminDashboard
+          onNavigate={(route) => navigateTo(route)}
+          onNavigateHome={() => navigateTo('/')}
+        />
         <OfflineIndicator />
       </>
     );

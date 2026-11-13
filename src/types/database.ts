@@ -39,8 +39,39 @@ export interface Business {
   logo_url?: string | null;
   operating_hours: BusinessOperatingHoursWeekly;
   is_active: boolean;
+  registration_status?: 'pending' | 'approved' | 'rejected' | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  admin_id?: string | null;
+  admin_email?: string | null;
+  action: string;
+  entity_type: string;
+  entity_id?: string | null;
+  details?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface PlatformSettings {
+  id: string;
+  platform_name: string;
+  tagline: string;
+  allow_new_registrations: boolean;
+  require_registration_approval: boolean;
+  default_trial_days: number;
+  subscription_price_ghs: number;
+  subscription_period_days: number;
+  timezone: string;
+  currency: string;
+  email_alerts_enabled: boolean;
+  updated_at: string;
+  updated_by?: string | null;
 }
 
 export interface Service {

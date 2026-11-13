@@ -32,6 +32,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const handlerMap: Record<string, string> = {
+  '/api/admin/health': './api/admin/health.ts',
   '/api/sms/send': './api/sms/send.ts',
   '/api/sms/test': './api/sms/test.ts',
   '/api/sms/config': './api/sms/config.ts',

@@ -138,6 +138,14 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
               phone: '+233200000000',
               role: 'super_admin',
             });
+            await supabase.from('admin_audit_logs').insert({
+              admin_id: user.id,
+              admin_email: cleanEmail,
+              action: 'super_admin_login',
+              entity_type: 'admin_session',
+              entity_id: user.id,
+              details: { method: 'password' },
+            }).then(() => {}, () => {});
             await refreshProfile();
             onNavigate('admin');
             return;
@@ -152,6 +160,14 @@ export const LoginPage: React.FC<Props> = ({ onNavigate }) => {
           await refreshProfile();
 
           if (profileData?.role === 'super_admin') {
+            await supabase.from('admin_audit_logs').insert({
+              admin_id: user.id,
+              admin_email: cleanEmail,
+              action: 'super_admin_login',
+              entity_type: 'admin_session',
+              entity_id: user.id,
+              details: { method: 'password' },
+            }).then(() => {}, () => {});
             onNavigate('admin');
             return;
           }
