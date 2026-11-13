@@ -161,7 +161,7 @@ function AppRouter() {
       return (
         <>
           <DatabaseSetupBanner />
-          <div className="min-h-screen bg-zinc-50 py-8 px-4">
+          <div className="min-h-screen bg-[#F3F4FE] py-8 px-4">
             <div className="max-w-3xl mx-auto space-y-4">
               <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
                 Your SamleyBook subscription has expired. Renew your subscription to regain access to your business dashboard and continue managing your appointments.

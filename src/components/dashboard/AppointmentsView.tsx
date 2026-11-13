@@ -31,10 +31,28 @@ export const AppointmentsView: React.FC = () => {
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [smsActionLoading, setSmsActionLoading] = useState(false);
   const [smsActionMsg, setSmsActionMsg] = useState<string | null>(null);
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
 
   React.useEffect(() => {
-    const saved = localStorage.getItem('samley_appt_view');
-    if (saved === 'list' || saved === 'calendar') setViewMode(saved);
+    const openMode = localStorage.getItem('samley_appt_open_mode');
+    if (openMode === 'list') {
+      setViewMode('list');
+      setUpcomingOnly(false);
+    } else if (openMode === 'calendar-month') {
+      setViewMode('calendar');
+      setCalMode('month');
+      setUpcomingOnly(false);
+    } else if (openMode === 'calendar-day') {
+      setViewMode('calendar');
+      setCalMode('day');
+      setUpcomingOnly(false);
+    } else if (openMode === 'upcoming') {
+      setViewMode('list');
+      setUpcomingOnly(true);
+    } else {
+      const saved = localStorage.getItem('samley_appt_view');
+      if (saved === 'list' || saved === 'calendar') setViewMode(saved);
+    }
   }, []);
   React.useEffect(() => {
     localStorage.setItem('samley_appt_view', viewMode);
@@ -46,7 +64,9 @@ export const AppointmentsView: React.FC = () => {
       a.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.customer_phone.includes(searchQuery) ||
       (a.service?.name && a.service.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesStatus && matchesSearch;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isUpcomingAppt = (a.status === 'confirmed' || a.status === 'pending') && a.appointment_date >= todayStr;
+    return matchesStatus && matchesSearch && (!upcomingOnly || isUpcomingAppt);
   });
 
   const handleUpdateStatus = async (apptId: string, newStatus: AppointmentStatus) => {
@@ -135,7 +155,9 @@ export const AppointmentsView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-zinc-900 tracking-tight">Appointments & Bookings</h2>
+          <h2 className="text-xl font-black text-zinc-900 tracking-tight">
+            {upcomingOnly ? 'Upcoming Appointments' : 'Appointments & Bookings'}
+          </h2>
           <p className="text-xs text-zinc-500">
             Real-time appointments received from your public QR code and booking page
           </p>
