@@ -7,8 +7,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "dev:api": "npx tsx api/dev-server.ts",
+    "dev": "tsx server.ts",
+    "start": "node server.ts",
+    "dev:api": "tsx api/dev-server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

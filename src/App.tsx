@@ -6,6 +6,7 @@ import { MarketingPage } from './components/marketing/MarketingPage';
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { DashboardLayout, DashboardTab } from './components/dashboard/DashboardLayout';
+import { DashboardView } from './components/dashboard/DashboardView';
 import { OverviewView } from './components/dashboard/OverviewView';
 import { ServicesView } from './components/dashboard/ServicesView';
 import { AppointmentsView } from './components/dashboard/AppointmentsView';
@@ -40,7 +41,7 @@ function AppRouter() {
     return normalizePath(window.location.pathname || '/');
   });
 
-  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('overview');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('dashboard');
   const [createBusinessModalOpen, setCreateBusinessModalOpen] = useState(false);
 
   // Sync with browser back/forward buttons
@@ -161,7 +162,7 @@ function AppRouter() {
       return (
         <>
           <DatabaseSetupBanner />
-          <div className="min-h-screen bg-[#F3F4FE] py-8 px-4">
+          <div className="min-h-screen bg-[#F5F6FA] py-8 px-4">
             <div className="max-w-3xl mx-auto space-y-4">
               <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm">
                 Your SamleyBook subscription has expired. Renew your subscription to regain access to your business dashboard and continue managing your appointments.
@@ -183,6 +184,8 @@ function AppRouter() {
     // Render tab views
     const renderTabView = () => {
       switch (dashboardTab) {
+        case 'dashboard':
+          return <DashboardView onSelectTab={setDashboardTab} />;
         case 'overview':
           return <OverviewView onSelectTab={setDashboardTab} />;
         case 'services':
@@ -206,7 +209,7 @@ function AppRouter() {
         case 'settings':
           return <SettingsView />;
         default:
-          return <OverviewView onSelectTab={setDashboardTab} />;
+          return <DashboardView onSelectTab={setDashboardTab} />;
       }
     };
 
@@ -217,7 +220,7 @@ function AppRouter() {
           currentTab={dashboardTab}
           onSelectTab={setDashboardTab}
           onNavigateHome={() => navigateTo('/')}
-          onOpenCreateBusinessModal={() => setCreateBusinessModalOpen(false)}
+          onOpenCreateBusinessModal={() => setCreateBusinessModalOpen(true)}
         >
           {renderTabView()}
         </DashboardLayout>
