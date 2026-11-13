@@ -197,11 +197,19 @@ function AppRouter() {
       })
     : null;
 
-  // Re-verify subscription status on protected route navigation
+  const lastSubRefreshPathRef = useRef<string | null>(null);
+
+  // Re-verify subscription status cleanly on protected route navigation
   useEffect(() => {
-    if (isDashboardRoute) {
-      void refreshSubscription();
+    if (!isDashboardRoute) {
+      lastSubRefreshPathRef.current = null;
+      return;
     }
+    if (lastSubRefreshPathRef.current === currentPath) {
+      return;
+    }
+    lastSubRefreshPathRef.current = currentPath;
+    void refreshSubscription();
   }, [currentPath, isDashboardRoute, refreshSubscription]);
 
   // Redirect locked business routes cleanly to /app/subscription

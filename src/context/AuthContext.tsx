@@ -43,61 +43,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hadSessionRef = useRef<boolean>(false);
   const manualSignOutRef = useRef<boolean>(false);
+  const loadedProfileUserIdRef = useRef<string | null>(null);
+  const inFlightProfileRef = useRef<{ userId: string; promise: Promise<void> } | null>(null);
 
   const clearSessionExpired = useCallback(() => {
     setSessionExpired(false);
   }, []);
 
-  const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
+  const fetchProfile = useCallback(async (userId: string, userEmail?: string, force = false) => {
     const supabase = getSupabase();
     if (!supabase) return;
 
-    setProfileLoading(true);
-    try {
-      const normalizedEmail = (userEmail || '').toLowerCase().trim();
-      const isSuperAdminEmail = normalizedEmail === SUPER_ADMIN_EMAIL;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-      }
-
-      if (data) {
-        if (isSuperAdminEmail && data.role !== 'super_admin') {
-          await supabase
-            .from('profiles')
-            .update({ role: 'super_admin' })
-            .eq('id', userId);
-          setProfile({ ...data, role: 'super_admin' } as Profile);
-        } else {
-          setProfile(data as Profile);
-        }
-      } else if (isSuperAdminEmail) {
-        const adminProfile: Partial<Profile> = {
-          id: userId,
-          email: SUPER_ADMIN_EMAIL,
-          full_name: 'Super Admin',
-          phone: '+233200000000',
-          role: 'super_admin',
-        };
-        await supabase.from('profiles').upsert(adminProfile);
-        setProfile(adminProfile as Profile);
-      }
-    } catch (err) {
-      console.error('Failed to load user profile:', err);
-    } finally {
-      setProfileLoading(false);
+    if (!force && inFlightProfileRef.current?.userId === userId) {
+      return inFlightProfileRef.current.promise;
     }
+
+    const run = (async () => {
+      setProfileLoading(true);
+      try {
+        const normalizedEmail = (userEmail || '').toLowerCase().trim();
+        const isSuperAdminEmail = normalizedEmail === SUPER_ADMIN_EMAIL;
+
+        const queryPromise = supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        const result = await Promise.race([
+          queryPromise,
+          new Promise<{ data: null; error: Error }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: new Error('Profile fetch timeout') }), 8000)
+          ),
+        ]);
+
+        const { data, error } = result;
+        if (error) {
+          console.error('Error fetching profile:', error);
+        }
+
+        if (data) {
+          loadedProfileUserIdRef.current = userId;
+          if (isSuperAdminEmail && data.role !== 'super_admin') {
+            await supabase
+              .from('profiles')
+              .update({ role: 'super_admin' })
+              .eq('id', userId);
+            setProfile({ ...data, role: 'super_admin' } as Profile);
+          } else {
+            setProfile(data as Profile);
+          }
+        } else if (isSuperAdminEmail) {
+          loadedProfileUserIdRef.current = userId;
+          const adminProfile: Partial<Profile> = {
+            id: userId,
+            email: SUPER_ADMIN_EMAIL,
+            full_name: 'Super Admin',
+            phone: '+233200000000',
+            role: 'super_admin',
+          };
+          await supabase.from('profiles').upsert(adminProfile);
+          setProfile(adminProfile as Profile);
+        }
+      } catch (err) {
+        console.error('Failed to load user profile:', err);
+      } finally {
+        if (inFlightProfileRef.current?.userId === userId) {
+          inFlightProfileRef.current = null;
+        }
+        setProfileLoading(false);
+      }
+    })();
+
+    inFlightProfileRef.current = { userId, promise: run };
+    return run;
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (user?.id) {
-      await fetchProfile(user.id, user.email);
+      await fetchProfile(user.id, user.email, true);
     }
   }, [user?.id, user?.email, fetchProfile]);
 
@@ -117,6 +141,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let mounted = true;
 
+    const safetyTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoading(false);
+        setProfileLoading(false);
+      }
+    }, 8000);
+
     // Restore initial session cleanly BEFORE dropping isLoading so /app/login never flashes
     supabase.auth
       .getSession()
@@ -130,16 +161,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchProfile(initialSession.user.id, initialSession.user.email);
         } else {
           hadSessionRef.current = false;
+          loadedProfileUserIdRef.current = null;
           setProfile(null);
         }
 
         if (mounted) {
+          window.clearTimeout(safetyTimer);
           setIsLoading(false);
         }
       })
       .catch((err) => {
         console.error('Failed to get session:', err);
         if (mounted) {
+          window.clearTimeout(safetyTimer);
           setIsLoading(false);
           setProfileLoading(false);
         }
@@ -157,12 +191,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hadSessionRef.current = true;
         manualSignOutRef.current = false;
         setSessionExpired(false);
-        void fetchProfile(nextSession.user.id, nextSession.user.email);
+        if (loadedProfileUserIdRef.current !== nextSession.user.id) {
+          void fetchProfile(nextSession.user.id, nextSession.user.email);
+        }
       } else {
         const wasSignedIn = hadSessionRef.current;
         const wasManual = manualSignOutRef.current;
         hadSessionRef.current = false;
         manualSignOutRef.current = false;
+        loadedProfileUserIdRef.current = null;
         setProfile(null);
         setProfileLoading(false);
 
@@ -171,11 +208,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           void clearSensitiveClientCaches();
         }
       }
+      window.clearTimeout(safetyTimer);
       setIsLoading(false);
     });
 
     return () => {
       mounted = false;
+      window.clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, [fetchProfile, isConfigured]);

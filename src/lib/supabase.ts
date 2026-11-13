@@ -132,7 +132,13 @@ export async function testSupabaseConnection(url?: string, anonKey?: string): Pr
   }
 
   try {
-    const testClient = createClient(targetUrl, targetKey);
+    const testClient = createClient(targetUrl, targetKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
 
     // 1. First test basic Supabase project reachability and auth key validity
     try {

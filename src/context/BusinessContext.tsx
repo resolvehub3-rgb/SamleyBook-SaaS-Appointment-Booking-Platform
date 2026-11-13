@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import {
@@ -53,6 +53,11 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  const nowTickRef = useRef<number>(nowTick);
+  nowTickRef.current = nowTick;
+
+  const currentBusinessIdRef = useRef<string | null>(null);
+  const subscriptionLoadedForBizRef = useRef<string | null>(null);
 
   // Periodic tick every 30s + immediate re-evaluation on window focus / visibility
   useEffect(() => {
@@ -79,19 +84,24 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 
   // Switch active business and store in localStorage for session persistence
-  const setCurrentBusiness = (business: Business) => {
-    if (business?.id !== currentBusiness?.id) {
+  const setCurrentBusiness = useCallback((business: Business) => {
+    if (business?.id !== currentBusinessIdRef.current && subscriptionLoadedForBizRef.current !== business?.id) {
       setSubscriptionLoading(true);
     }
+    currentBusinessIdRef.current = business?.id ?? null;
     setCurrentBusinessState(business);
     if (typeof window !== 'undefined' && business?.id) {
       localStorage.setItem('samley_active_business_id', business.id);
     }
-  };
+  }, []);
+
+  const userId = user?.id ?? null;
 
   const fetchBusinesses = useCallback(async () => {
     const supabase = getSupabase();
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
+      currentBusinessIdRef.current = null;
+      subscriptionLoadedForBizRef.current = null;
       setBusinesses([]);
       setCurrentBusinessState(null);
       setSubscription(null);
@@ -105,11 +115,12 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { data, error } = await supabase
         .from('businesses')
         .select('*')
-        .eq('owner_id', user.id)
+        .eq('owner_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching businesses:', error);
+        setSubscriptionLoading(false);
       } else if (data) {
         const bList = data as Business[];
         setBusinesses(bList);
@@ -120,10 +131,17 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             : null;
         const matched = bList.find((b) => b.id === savedId) || bList[0] || null;
         if (matched) {
-          setSubscriptionLoading(true);
+          if (
+            matched.id !== currentBusinessIdRef.current ||
+            subscriptionLoadedForBizRef.current !== matched.id
+          ) {
+            setSubscriptionLoading(true);
+          }
         } else {
+          subscriptionLoadedForBizRef.current = null;
           setSubscriptionLoading(false);
         }
+        currentBusinessIdRef.current = matched?.id ?? null;
         setCurrentBusinessState(matched);
       }
     } catch (err) {
@@ -132,50 +150,67 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   const fetchSubscriptionOnly = useCallback(async (businessId: string) => {
     const supabase = getSupabase();
     if (!supabase || !businessId) return null;
 
-    setNowTick(Date.now());
+    const clientNow = Date.now();
+    if (Math.abs(clientNow - nowTickRef.current) > 5000) {
+      setNowTick(clientNow);
+    }
 
-    // Try authoritative server UTC status check first (lazily marks expired rows in DB)
+    // Try authoritative server UTC status check first (lazily marks expired rows in DB) with 6s timeout
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (session?.access_token) {
-        const res = await fetch(
-          `/api/subscriptions/status?businessId=${encodeURIComponent(businessId)}`,
-          {
-            headers: { Authorization: `Bearer ${session.access_token}` },
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 6000);
+        try {
+          const res = await fetch(
+            `/api/subscriptions/status?businessId=${encodeURIComponent(businessId)}`,
+            {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+              signal: controller.signal,
+            }
+          );
+          if (res.ok) {
+            const json = await res.json();
+            if (json?.serverNowUtc) {
+              const serverMs = Date.parse(json.serverNowUtc);
+              if (Number.isFinite(serverMs) && Math.abs(serverMs - nowTickRef.current) > 5000) {
+                setNowTick(serverMs);
+              }
+            }
+            if (json?.subscription !== undefined) {
+              subscriptionLoadedForBizRef.current = businessId;
+              setSubscription(json.subscription as BusinessSubscription | null);
+              return json.subscription as BusinessSubscription | null;
+            }
           }
-        );
-        if (res.ok) {
-          const json = await res.json();
-          if (json?.serverNowUtc) {
-            const serverMs = Date.parse(json.serverNowUtc);
-            if (Number.isFinite(serverMs)) setNowTick(serverMs);
-          }
-          if (json?.subscription !== undefined) {
-            setSubscription(json.subscription as BusinessSubscription | null);
-            return json.subscription as BusinessSubscription | null;
-          }
+        } finally {
+          window.clearTimeout(timer);
         }
       }
     } catch {
       // Fallback to direct Supabase query below
     }
 
-    const { data: subData } = await supabase
-      .from('business_subscriptions')
-      .select('*, plan:subscription_plans(*)')
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: subData } = await Promise.race([
+      supabase
+        .from('business_subscriptions')
+        .select('*, plan:subscription_plans(*)')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 8000)),
+    ]);
 
+    subscriptionLoadedForBizRef.current = businessId;
     setSubscription(subData as BusinessSubscription | null);
     return (subData as BusinessSubscription | null) || null;
   }, []);
@@ -184,9 +219,14 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const fetchCurrentBusinessDetails = useCallback(
     async (businessId: string) => {
       const supabase = getSupabase();
-      if (!supabase || !businessId) return;
+      if (!supabase || !businessId) {
+        setSubscriptionLoading(false);
+        return;
+      }
 
-      setSubscriptionLoading(true);
+      if (subscriptionLoadedForBizRef.current !== businessId) {
+        setSubscriptionLoading(true);
+      }
       try {
         // 1. Authoritative Subscription check first
         const subData = await fetchSubscriptionOnly(businessId);
@@ -198,45 +238,42 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setServices([]);
           setAppointments([]);
           setCustomers([]);
+          setSubscriptionLoading(false);
           return;
         }
 
-        // 2. Payment config
-        const { data: payData } = await supabase
-          .from('payment_configurations')
-          .select('*')
-          .eq('business_id', businessId)
-          .maybeSingle();
+        // Unlock workspace shell immediately once subscription access is resolved
+        setSubscriptionLoading(false);
 
-        setPaymentConfig(payData as PaymentConfiguration | null);
+        // 2-5. Fetch operational business data in parallel
+        const [payRes, svcRes, apptRes, custRes] = await Promise.all([
+          supabase
+            .from('payment_configurations')
+            .select('*')
+            .eq('business_id', businessId)
+            .maybeSingle(),
+          supabase
+            .from('services')
+            .select('*')
+            .eq('business_id', businessId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('appointments')
+            .select('*, service:services(*)')
+            .eq('business_id', businessId)
+            .order('appointment_date', { ascending: false })
+            .order('appointment_time', { ascending: false }),
+          supabase
+            .from('customers')
+            .select('*')
+            .eq('business_id', businessId)
+            .order('created_at', { ascending: false }),
+        ]);
 
-        // 3. Services
-        const { data: svcData } = await supabase
-          .from('services')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
-
-        setServices((svcData as Service[]) || []);
-
-        // 4. Appointments
-        const { data: apptData } = await supabase
-          .from('appointments')
-          .select('*, service:services(*)')
-          .eq('business_id', businessId)
-          .order('appointment_date', { ascending: false })
-          .order('appointment_time', { ascending: false });
-
-        setAppointments((apptData as Appointment[]) || []);
-
-        // 5. Customers
-        const { data: custData } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
-
-        setCustomers((custData as Customer[]) || []);
+        setPaymentConfig(payRes.data as PaymentConfiguration | null);
+        setServices((svcRes.data as Service[]) || []);
+        setAppointments((apptRes.data as Appointment[]) || []);
+        setCustomers((custRes.data as Customer[]) || []);
       } catch (err) {
         console.error('Error fetching business details:', err);
       } finally {
@@ -247,9 +284,11 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       fetchBusinesses();
     } else {
+      currentBusinessIdRef.current = null;
+      subscriptionLoadedForBizRef.current = null;
       setBusinesses([]);
       setCurrentBusinessState(null);
       setSubscription(null);
@@ -260,7 +299,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setCustomers([]);
       setIsLoading(false);
     }
-  }, [user, fetchBusinesses]);
+  }, [userId, fetchBusinesses]);
 
   useEffect(() => {
     if (currentBusiness?.id) {
@@ -347,9 +386,9 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [currentBusiness?.id, fetchCurrentBusinessDetails]);
 
-  const createBusiness = async (businessData: Partial<Business>) => {
+  const createBusiness = useCallback(async (businessData: Partial<Business>) => {
     const supabase = getSupabase();
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return { business: null, error: new Error('User not authenticated') };
     }
 
@@ -357,13 +396,13 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { data, error } = await supabase
         .from('businesses')
         .insert({
-          owner_id: user.id,
+          owner_id: userId,
           name: businessData.name,
           slug: businessData.slug,
           category: businessData.category,
           description: businessData.description || '',
           phone: businessData.phone,
-          email: businessData.email || user.email,
+          email: businessData.email || user?.email,
           address: businessData.address,
           logo_url: businessData.logo_url || null,
           operating_hours: businessData.operating_hours,
@@ -420,9 +459,9 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         error: err instanceof Error ? err : new Error('Creation failed'),
       };
     }
-  };
+  }, [userId, user?.email, fetchBusinesses, setCurrentBusiness]);
 
-  const updateBusiness = async (id: string, updates: Partial<Business>) => {
+  const updateBusiness = useCallback(async (id: string, updates: Partial<Business>) => {
     const supabase = getSupabase();
     if (!supabase) return { error: new Error('Supabase client not ready') };
 
@@ -432,37 +471,63 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       await fetchBusinesses();
     }
     return { error: error as Error | null };
-  };
+  }, [fetchBusinesses]);
+
+  const refreshBusinessData = useCallback(async () => {
+    const bizId = currentBusinessIdRef.current;
+    if (bizId) {
+      await fetchCurrentBusinessDetails(bizId);
+    }
+  }, [fetchCurrentBusinessDetails]);
+
+  const refreshSubscription = useCallback(async () => {
+    const bizId = currentBusinessIdRef.current;
+    if (bizId) {
+      await fetchSubscriptionOnly(bizId);
+    }
+  }, [fetchSubscriptionOnly]);
+
+  const contextValue = useMemo(
+    () => ({
+      businesses,
+      currentBusiness,
+      setCurrentBusiness,
+      subscription,
+      subscriptionAccess,
+      subscriptionLoading,
+      paymentConfig,
+      services,
+      appointments,
+      customers,
+      isLoading,
+      createBusiness,
+      updateBusiness,
+      refreshBusinesses: fetchBusinesses,
+      refreshBusinessData,
+      refreshSubscription,
+    }),
+    [
+      businesses,
+      currentBusiness,
+      setCurrentBusiness,
+      subscription,
+      subscriptionAccess,
+      subscriptionLoading,
+      paymentConfig,
+      services,
+      appointments,
+      customers,
+      isLoading,
+      createBusiness,
+      updateBusiness,
+      fetchBusinesses,
+      refreshBusinessData,
+      refreshSubscription,
+    ]
+  );
 
   return (
-    <BusinessContext.Provider
-      value={{
-        businesses,
-        currentBusiness,
-        setCurrentBusiness,
-        subscription,
-        subscriptionAccess,
-        subscriptionLoading,
-        paymentConfig,
-        services,
-        appointments,
-        customers,
-        isLoading,
-        createBusiness,
-        updateBusiness,
-        refreshBusinesses: fetchBusinesses,
-        refreshBusinessData: async () => {
-          if (currentBusiness?.id) {
-            await fetchCurrentBusinessDetails(currentBusiness.id);
-          }
-        },
-        refreshSubscription: async () => {
-          if (currentBusiness?.id) {
-            await fetchSubscriptionOnly(currentBusiness.id);
-          }
-        },
-      }}
-    >
+    <BusinessContext.Provider value={contextValue}>
       {children}
     </BusinessContext.Provider>
   );
