@@ -14,6 +14,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
+import { motion } from 'motion/react';
 import { getSupabase } from '../../lib/supabase';
 import { formatGHS, formatDurationMinutes } from '../../utils/booking-logic';
 import { Appointment, AppointmentStatus } from '../../types/database';
@@ -310,8 +311,25 @@ export const AppointmentsView: React.FC = () => {
       )}
 
       {viewMode === 'calendar' && (
-        <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-6 space-y-4">
-          {/* Calendar mode switcher */}
+        <div className="space-y-4">
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {[
+              { label: 'Total', value: appointments.length, color: 'text-zinc-900', bg: 'bg-zinc-100' },
+              { label: 'Confirmed', value: appointments.filter((a) => a.status === 'confirmed').length, color: 'text-blue-600', bg: 'bg-blue-50' },
+              { label: 'Pending', value: appointments.filter((a) => a.status === 'pending').length, color: 'text-amber-600', bg: 'bg-amber-50' },
+              { label: 'Completed', value: appointments.filter((a) => a.status === 'completed').length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+              { label: 'Cancelled', value: appointments.filter((a) => a.status === 'cancelled').length, color: 'text-red-600', bg: 'bg-red-50' },
+            ].map((s, i) => (
+              <div key={i} className="p-3 rounded-2xl bg-white border border-zinc-200/80 shadow-xs">
+                <p className="text-[10px] font-bold uppercase text-zinc-400">{s.label}</p>
+                <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-xs p-6 space-y-4">
+            {/* Calendar mode switcher */}
           <div className="flex items-center gap-2">
             {(['month', 'week', 'day'] as const).map((m) => (
               <button
@@ -448,6 +466,7 @@ export const AppointmentsView: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
       )}
 
       {/* SMS notification toast */}
